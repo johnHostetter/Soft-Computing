@@ -31,6 +31,10 @@ class PseudoTrapezoidMembershipFunction:
             d = inf ,
         and
             I(x) = D(x) = exp(- pow(((x - mean(x)) / sigma), 2)) .
+            
+        Citation:
+            A Course in Fuzzy Systems and Control by Li-Xin Wang
+            Chapter 10.1 Preliminary Concepts pg. 129
         """
         if a <= b and b <= c and c <= d and (0 < H and H <= 1):
             self.a = a
