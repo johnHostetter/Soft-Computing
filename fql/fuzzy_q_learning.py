@@ -36,7 +36,7 @@ class Model(object):
         if self.q_initial_value == 'zero':
             self.q_table = np.zeros((self.fis.get_number_of_rules(), self.action_set_length))
 
-    def CalculateTruthValue(self,state_value):
+    def CalculateTruthValue(self, state_value):
         self.R = []
         self.L = []
         input_variables = self.fis.list_of_input_variable
@@ -60,21 +60,48 @@ class Model(object):
                     if action > max:
                         action_index = index
             else:
-                action_index = random.randint(0, self.action_set_length -1)
-            self.M.append(action_index)
+                action_index = random.randint(0, self.action_set_length - 1)
+            try:
+                self.M.append(action_index)
+            except UnboundLocalError:
+                print('UnboundLocalError.')
+                
+    def OfflineActionSelection(self, a):
+        self.M = []
+        r = random.uniform(0, 1)
+        max = -sys.maxsize
+        for rull in self.q_table:
+            if r < self.ee_rate:
+                for index , action in enumerate(rull):
+                    if action > max:
+                        action_index = index
+            else:
+                action_index = random.randint(0, self.action_set_length - 1)
+            try:
+                action_set = [-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0 ,1,2,3,4,5,6,7,8,9,10]
+                action_index = list.index(action_set, a)
+                self.M.append(action_index)
+            except UnboundLocalError:
+                print('UnboundLocalError.')
 
     def InferredAction(self):
         max = -sys.maxsize
         for index , truth_value in enumerate(self.R):
             if truth_value > max:
                 max = truth_value
-                action = self.M[index]
+                try:
+                    action = self.M[index]
+                except IndexError:
+                    print('IndexError with the following value: %s' % index)
         return action
 
     def CalculateQValue(self):
         self.Q = 0
         for index, truth_value in enumerate(self.R):
-            self.Q = self.Q + truth_value * self.q_table[index,self.M[index]]
+            try:
+                self.Q = self.Q + truth_value * self.q_table[index, self.M[index]]
+            except IndexError:
+                print('IndexError with the following value: %s' % index)
         self.Q = self.Q / sum(self.R)
 
     def CalculateStateValue(self):
@@ -95,12 +122,15 @@ class Model(object):
     def UpdateqValue(self):
         for index, truth_value in enumerate(self.R_):
             delta_Q = self.alpha * (self.Error * truth_value)
-            self.q_table[index][self.M[index]] = self.q_table[index][self.M[index]] + delta_Q
+            try:
+                self.q_table[index][self.M[index]] = self.q_table[index][self.M[index]] + delta_Q
+            except IndexError:
+                print('IndexError with the following value: %s' % index)
 
     def KeepStateHistory(self):
         self.R_ = copy.copy(self.R)
 
-    def get_initial_action(self,state):
+    def get_initial_action(self, state):
         self.CalculateTruthValue(state)
         self.ActionSelection()
         action = self.InferredAction()
@@ -108,7 +138,7 @@ class Model(object):
         self.KeepStateHistory()
         return action
 
-    def run(self,state, reward):
+    def run(self, state, reward):
         self.CalculateTruthValue(state)
         self.CalculateStateValue()
         self.CalculateQualityVariation(reward)
@@ -116,5 +146,23 @@ class Model(object):
         self.ActionSelection()
         action = self.InferredAction()
         self.CalculateQValue()
+        self.KeepStateHistory()
+        return action
+    
+    def run_offline(self, state, action, reward):
+        self.CalculateTruthValue(state)
+        self.CalculateStateValue()
+        self.CalculateQualityVariation(reward)
+        self.UpdateqValue()
+        self.OfflineActionSelection(action)
+#        action = self.InferredAction()
+        self.CalculateQValue()
+        self.KeepStateHistory()
+        
+    def induce_policy(self, state, reward):
+        self.CalculateTruthValue(state)
+        self.CalculateStateValue()
+        self.ActionSelection()
+        action = self.InferredAction()
         self.KeepStateHistory()
         return action
