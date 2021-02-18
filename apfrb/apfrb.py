@@ -52,6 +52,39 @@ scaler.fit(X_train)
 X_train = scaler.transform(X_train)
 X_test = scaler.transform(X_test)
 
+def subs(x):
+    if x:
+        return 1.0
+    else:
+        return -1.0
+
+class Rule:
+    def __init__(self, antecedents, consequents, lookup, v):
+        self.antecedents = antecedents # dictionary
+        self.consequents = consequents # dictionary
+        self.lookup = lookup # lookup table for the term's linguistic meaning
+        self.v = v
+    
+    def __str__(self):
+        indexes = list(self.antecedents.keys())
+        values = list(self.antecedents.values())
+        
+        a = list(self.consequents.values())
+        signs = list(map(subs, values)) # a vector describing the +/- signs for the a's in the IF-THEN consequents
+        consequent = a[0] + np.dot(signs, a[1:]) # TODO: consider storing the consequent in the rule
+        output = 'IF '
+        for loop_idx in range(len(values)):
+            index = indexes[loop_idx]
+            entry = values[loop_idx]
+            if entry: # term+ is present
+                output += ('x_%s is %s %.2f ' % (index, self.lookup[index - 1][1], self.v[index - 1]))
+            else:
+                output += ('x_%s is %s %.2f ' % (index, self.lookup[index - 1][0], self.v[index - 1]))
+            if loop_idx != len(values) - 1:
+                output += 'AND '
+        output += 'THEN f = %.2f' % (consequent) # the consequent for the IF-THEN rule
+        return output
+
 class ANN:
     def __init__(self, W, b, c, beta):
         """
@@ -149,8 +182,20 @@ class APFRB:
         self.table = list(itertools.product([False, True], repeat=l)) # repeat the number of times there are rule antecedents
         self.lookup = {}
         self.logistic_terms = ['smaller than', 'larger than']
-        for key in range(len(self.W[0])):
+        self.rules = []
+        if self.n > self.m:
+            size = self.n
+        else:
+            size = self.m
+        for key in range(size):
             self.lookup[key] = self.logistic_terms
+        for i in range(self.r):
+            rule = self.table[i] # only contains the antecedents' term assignments
+            # signs = list(map(subs, rule)) # TODO: consider storing the consequent in the rule
+            # consequent = self.a[0] + np.dot(signs, self.a[1:]) # TODO: consider storing the consequent in the rule
+            antecedents = {(key + 1): value for key, value in enumerate(rule)} # indexed by x_i
+            consequents = {key: value for key, value in enumerate(self.a)} # indexed by a_i, including a_0
+            self.rules.append(Rule(antecedents, consequents, self.lookup, self.v))
             
     def rule_str(self, i):
         """
@@ -196,7 +241,8 @@ class APFRB:
         """
         frb = []
         for i in range(self.r):
-            frb.append(self.rule_str(i))
+            # frb.append(self.rule_str(i))
+            frb.append(str(self.rules[i]))
         return '\n'.join(frb)
     
     def inference(self, z):
@@ -303,6 +349,7 @@ class APFRB:
         return np.exp(-1.0 * (pow(y - k[0], 2)) / (k[0] - k[1]))
     
     def T_inv(self):
+        
         """
         Defines the inverse transformation between APFRB to ANN.
 
@@ -312,10 +359,33 @@ class APFRB:
             This APFRB's equivalent ANN.
 
         """
-        beta = APFRB.a[0] # fetching the output node's bias
-        b = -1.0 * APFRB.v # returning the biases to their original value
-        c = APFRB.a[1:] # fetching the weights between the hidden layer and the output node
-        return ANN(APFRB.W, b, c, beta)
+        beta = self.a[0] # fetching the output node's bias
+        b = -1.0 * self.v # returning the biases to their original value
+        c = self.a[1:] # fetching the weights between the hidden layer and the output node
+        return ANN(self.W, b, c, beta)
+    
+    def simplify(self):
+        """ step 1, for each k, if the abs(a_k) is small, 
+        remove the atoms containing x_k in the IF part,
+        and remove a_k from the THEN part of all the rules """
+        
+        # TODO: Exception was thrown - fix it
+        
+        # step 1
+        sorted_a = sorted([abs(x) for x in self.a[1:]]) # ignore the output node bias, find absolute values, and sort
+        small_val = min(sorted_a)
+        small_val_k = self.a.index(small_val)
+        
+        for rule in self.rules:
+            try:
+                # try to delete all occurrences of x_k and a_k from any fuzzy logic rules
+                del rule.antecedents[small_val_k]
+                del rule.consequents[small_val_k]
+            except KeyError:
+                break
+        returned_val = apfrb.a.pop(small_val_k)        
+        if returned_val != small_val:
+            raise Exception('The removed value from the APFRB \'a\' was not the expected value.')
 
 def main():
     """
@@ -336,12 +406,14 @@ def main():
         The number of fuzzy logic rules for all permutations.
 
     """
-    W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
-    # W = np.random.random(size=(8, 8))
-    b = np.array([-7, -520, -11])
-    c = np.array([-0.5, 0.5, -1])
-    # b = np.random.random(size=(8,))
-    # c = np.random.random(size=(8,))
+    # W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
+    n_inputs = 4 # number of inputs
+    n_neurons = 4 # number of neurons in the hidden layer
+    W = np.random.random(size=(n_neurons, n_inputs))
+    # b = np.array([-7, -520, -11])
+    # c = np.array([-0.5, 0.5, -1])
+    b = np.random.random(size=(n_neurons,))
+    c = np.random.random(size=(n_neurons,))
     if len(b) != len(c):
         raise Exception('The vector \'b\' must equal the vector \'c\'.')
     l = len(W) # the number of antecedents in the fuzzy logic rules will be equal to the length of the column entries in W
