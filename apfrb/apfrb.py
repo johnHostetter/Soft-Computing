@@ -6,119 +6,15 @@ Created on Wed Feb 17 00:49:48 2021
 @author: john
 """
 
-import numpy as np
+import time
 import itertools
+import numpy as np
+from rule import Rule
+from common import bar, plot
+from copy import deepcopy
 from sklearn import datasets
-import matplotlib.pyplot as plt
 
-def subs(x):
-    if x:
-        return 1.0
-    else:
-        return -1.0
-    
-def bar(x, heights, title, x_lbl, y_lbl):
-    plt.bar(x, heights)
-    plt.title(title)
-    plt.xlabel(x_lbl)
-    plt.ylabel(y_lbl)
-    plt.show()
-    
-def plot(x, y, title, x_lbl, y_lbl):
-    plt.plot(x, y)
-    plt.title(title)
-    plt.xlabel(x_lbl)
-    plt.ylabel(y_lbl)
-    plt.show()
-    
-class Rule:
-    def __init__(self, antecedents, consequents, lookup, W, v):
-        self.antecedents = antecedents # dictionary
-        self.consequents = consequents # dictionary
-        self.lookup = lookup # lookup table for the term's linguistic meaning
-        self.W = W
-        self.v = v
-    
-    def __str__(self):
-        indexes = list(self.antecedents.keys())
-        values = list(self.antecedents.values())
-        
-        a = list(self.consequents.values())
-        signs = list(map(subs, values)) # a vector describing the +/- signs for the a's in the IF-THEN consequents
-        consequent = a[0] + np.dot(signs, a[1:]) # TODO: consider storing the consequent in the rule
-        output = 'IF '
-        for loop_idx in range(len(values)):
-            index = indexes[loop_idx]
-            entry = values[loop_idx]
-            if entry: # term+ is present
-                output += ('x_%s is %s %.2f ' % (index, self.lookup[index - 1][1], self.v[index - 1]))
-            else:
-                output += ('x_%s is %s %.2f ' % (index, self.lookup[index - 1][0], self.v[index - 1]))
-            if loop_idx != len(values) - 1:
-                output += 'AND '
-        output += 'THEN f = %.2f' % (consequent) # the consequent for the IF-THEN rule
-        return output
-    
-    def consequent(self):
-        values = list(self.antecedents.values())
-        a = list(self.consequents.values())
-        signs = list(map(subs, values)) # a vector describing the +/- signs for the a's in the IF-THEN consequents
-        return a[0] + np.dot(signs, a[1:])
-    
-    def t(self, z):
-        """
-        Calculates the degree of firing for this rule.
-
-        Parameters
-        ----------
-        z : list
-            The ANN's input.
-
-        Returns
-        -------
-        None.
-
-        """
-        degree = 1.0
-        indexes = list(self.antecedents.keys())
-        values = list(self.antecedents.values())
-        for loop_idx in range(len(values)):
-            index = indexes[loop_idx]
-            entry = values[loop_idx]
-            # y = x[index - 1]
-            y = np.dot(self.W[index - 1].T, z)
-            k = self.v[index - 1]
-            if entry:
-                degree *= self.logistic(y, k, '+')
-            else:
-                degree *= self.logistic(y, k)
-        return degree
-                
-    def logistic(self, y, k, t='-'):
-        """
-        The logistic membership function.
-
-        Parameters
-        ----------
-        y : float
-            The input.
-        k : float
-            The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
-        t : string, optional
-            Adjusts whether this logistic membership function is describing term- or term+. 
-            The default is '-'.
-
-        Returns
-        -------
-        float
-            The degree of membership.
-
-        """
-        val = 2.0
-        if t == '+':
-            val = -2.0
-        return 1.0 / (1.0 + np.exp(val * (y-k)))
-            
+np.random.seed(0)        
 
 class ANN:
     def __init__(self, W, b, c, beta):
@@ -207,62 +103,9 @@ class APFRB:
 
         """
         self.W = W # the weights between the raw inputs and the hidden layer
-        self.v = v # a vector of size m describing the biases for the ANN's hidden layer
+        self.v = list(v) # a vector of size m describing the biases for the ANN's hidden layer
         self.a = a # a vector of size m + 1 (since it includes a_0 - the output node's bias)
-        self.linguistic_terms = 'log' # TODO: add option to make Gaussian membership functions
-        self.l = len(self.W) # the number of antecedents in the fuzzy logic rules will be equal to the length of the column entries in W
-        self.r = pow(2, l) # the number of fuzzy logic rules for all permutations
-        self.m = len(self.v) # the number of neurons in the hidden layer
-        self.n = len(self.W[0]) # the number of raw inputs
-        self.table = list(itertools.product([False, True], repeat=l)) # repeat the number of times there are rule antecedents
-        self.lookup = {}
-        self.logistic_terms = ['smaller than', 'larger than']
-        self.rules = []
-        if self.n > self.m:
-            size = self.n
-        else:
-            size = self.m
-        for key in range(size):
-            self.lookup[key] = self.logistic_terms
-        for i in range(self.r):
-            rule = self.table[i] # only contains the antecedents' term assignments
-            # signs = list(map(subs, rule)) # TODO: consider storing the consequent in the rule
-            # consequent = self.a[0] + np.dot(signs, self.a[1:]) # TODO: consider storing the consequent in the rule
-            antecedents = {(key + 1): value for key, value in enumerate(rule)} # indexed by x_i
-            consequents = {key: value for key, value in enumerate(self.a)} # indexed by a_i, including a_0
-            self.rules.append(Rule(antecedents, consequents, self.lookup, self.W, self.v))
-            
-    def rule_str(self, i):
-        """
-        Get the i'th fuzzy logic rule as a string type.
-
-        Parameters
-        ----------
-        i : int
-            Indexes the Fuzzy Rule Base and gets the i'th fuzzy logic rule.
-
-        Returns
-        -------
-        output : TYPE
-            DESCRIPTION.
-
-        """
-        signs = [] # a vector describing the +/- signs for the a's in the IF-THEN consequents
-        output = 'Rule %s: IF ' % (i + 1)
-        rule = self.table[i]
-        j = 0
-        for entry in rule:
-            if entry: # term+ is present
-                output += ('x_%s is %s %s ' % (j + 1, self.lookup[j][1], self.v[j]))
-                signs.append(1.0)
-            else:
-                output += ('x_%s is %s %s ' % (j + 1, self.lookup[j][0], self.v[j]))
-                signs.append(-1.0)
-            j += 1
-            if j != len(rule):
-                output += 'AND '
-        output += 'THEN f = %s' % (self.a[0] + np.dot(signs, self.a[1:])) # the consequent for the IF-THEN rule
-        return output
+        self.__reset() # reset/initialize all the variables that are dependent upon 'W', 'v' or 'a'
     
     def __str__(self):
         """
@@ -276,11 +119,114 @@ class APFRB:
         """
         frb = []
         for i in range(self.r):
-            # frb.append(self.rule_str(i))
             frb.append(str(self.rules[i]))
         return '\n'.join(frb)
     
+    def __copy__(self):
+        """
+        Returns a shallow copy of the original APFRB.
+
+        Returns
+        -------
+        newone : TYPE
+            DESCRIPTION.
+
+        """
+        newone = type(self)()
+        newone.__dict__.update(self.__dict__)
+        return newone
+    
+    def __deepcopy__(self, memo):
+        """
+        Returns a deep copy of the original APFRB.
+
+        Parameters
+        ----------
+        memo : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        W = deepcopy(self.W)
+        v = deepcopy(self.v)
+        a = deepcopy(self.a)
+        return APFRB(W, v, a)
+    
+    def __reset(self):
+        """
+        Resets all of the APFRB's variables excluding the matrix 'W',
+        the vector 'v' and the vector 'a'. These variables are to be reset
+        if 'W', 'v' or 'a' are modified at any point.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.linguistic_terms = 'log' # TODO: add option to make Gaussian membership functions
+        self.l = len(self.W) # the number of antecedents in the fuzzy logic rules will be equal to the length of the column entries in W
+        self.r = pow(2, self.l) # the number of fuzzy logic rules for all permutations
+        self.m = len(self.v) # the number of neurons in the hidden layer
+        self.n = len(self.W[0]) # the number of raw inputs
+        self.table = list(itertools.product([False, True], repeat=self.l)) # repeat the number of times there are rule antecedents
+        self.lookup = {}
+        self.logistic_terms = ['smaller than', 'larger than']
+        self.rules = []
+        if self.n > self.m:
+            size = self.n
+        else:
+            size = self.m
+        for key in range(size):
+            self.lookup[key] = self.logistic_terms
+        for i in range(self.r):
+            rule = self.table[i] # only contains the antecedents' term assignments
+            antecedents = {(key + 1): value for key, value in enumerate(rule)} # indexed by x_i
+            consequents = {key: value for key, value in enumerate(self.a)} # indexed by a_i, including a_0
+            self.rules.append(Rule(antecedents, consequents, self.lookup, self.W, self.v))
+            
+    def __delete(self, i):
+        """
+        Deletes the i'th entry from vector 'v' and matrix 'W', and deletes 
+        the i'th + 1 entry from vector 'a' (to skip the a_0 entry aka the output's bias).
+    
+        CAUTION: This mutates the APFRB calling the private method. Use with extreme caution.
+
+        Parameters
+        ----------
+        i : int
+            i'th entry of vector 'v', matrix 'W', and i'th + 1 entry of vector 'a'.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.W = np.delete(self.W, 1, axis=0)
+        self.v = np.delete(self.v, 1, axis=0)
+        self.a = list(np.delete(self.a, i + 1, axis = 0))
+        self.__reset()
+    
     def __c_k(self, x, k):
+        """
+        
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+        k : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
         diffs = []
         rule_k = self.rules[k]
         for i in range(len(self.rules)):
@@ -339,7 +285,8 @@ class APFRB:
     
     def infer_with_u_and_d(self, z):
         """
-        
+        Conducts the APFRB's fuzzy inference and defuzzification when given a raw input 'z'.
+        Capable of execution when the APFRB is no longer equivalent to its previous ANN.
 
         Parameters
         ----------
@@ -357,6 +304,8 @@ class APFRB:
     def inference(self, z):
         """
         Conducts the APFRB's fuzzy inference and defuzzification when given a raw input 'z'.
+        
+        CAUTION: This may no longer work after simplifying the APFRB.
 
         Parameters
         ----------
@@ -366,7 +315,7 @@ class APFRB:
         Raises
         ------
         Exception
-            DESCRIPTION.
+            An exception is thrown when the error tolerance exceeds a constant value.
 
         Returns
         -------
@@ -484,6 +433,8 @@ class APFRB:
         
         # TODO: Exception was thrown after being called twice - replicate and fix it
         
+        start_time = time.time()
+        
         # step 1
         yes = True
         print('Would you like to remove an antecedent from the IF part? [y/n]')
@@ -511,7 +462,8 @@ class APFRB:
                 raw = input()
                 ans = int(raw)
                 small_val = sorted_a[ans]
-                small_val_indexes = np.where(np.array(self.a[1:]) <= small_val)[0]
+                temp = np.array([abs(x) for x in self.a[1:]])
+                small_val_indexes = np.where(temp <= small_val)[0]
                 # small_val_k = self.a.index(small_val)
             except Exception:
                 if raw.lower() == 'cancel':
@@ -522,7 +474,8 @@ class APFRB:
                     continue
             
             for index in small_val_indexes:
-                small_val_k = self.a[index]
+                small_val_k = index + 1 # the index of x_k and a_k to be deleted
+                # small_val_k = self.a[index + 1] # add 1 to the index to skip over a_0 (required to keep)
                 for rule in self.rules:
                     try:
                         # try to delete all occurrences of x_k and a_k from any fuzzy logic rules
@@ -533,24 +486,29 @@ class APFRB:
                     
             # iterate through the vector 'a', swapping out entries with NoneType to delete later
             for index in small_val_indexes:
-                self.a[index] = None
+                self.a[index + 1] = None
+                
+            # TODO: unsure of this, but I believe that vector 'v' must also be cleaned as well
+            # iterate through the vector 'v', swapping out entries with NoneType to delete later
+            for index in small_val_indexes:
+                self.v[index] = None
+                
             while True:
                 try:
                     self.a.remove(None)
                 except Exception:
                     break
                 
-            # TODO: unsure of this, but I believe that vector 'v' must also be cleaned as well
-            # iterate through the vector 'v', swapping out entries with NoneType to delete later
-            for index in small_val_indexes:
-                self.v[index] = None
             while True:
                 try:
                     self.v.remove(None)
                 except Exception:
                     break
                 
-            print('\nWould you like to remove an antecedent from the IF part? [y/n]')
+            for rule in self.rules:
+                rule.normalize_keys()
+                
+            print('\nWould you like to remove another antecedent from the IF part? [y/n]')
             yes = input().lower() == 'y'
             
         # step 2
@@ -559,11 +517,14 @@ class APFRB:
         q = len(self.rules)
         for k in range(q):
             if k == q / 4:
-                print('A quarter of the way done...')
+                current_time = time.time()
+                print('A quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
             elif k == q / 2:
-                print('Halfway done...')
+                current_time = time.time()
+                print('Halfway done [elapsed time: %s seconds]...' % (current_time - start_time))
             elif k == 3 * q / 4:
-                print('Three quarters of the way done...')
+                current_time = time.time()
+                print('Three quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
             
             t_ks = []
             c_ks = []
@@ -574,10 +535,9 @@ class APFRB:
             m_k = max(t_ks)
             l_k = max(c_ks)
             m_k_l_ks.append(m_k * l_k)
-        plt.plot(range(q), sorted(m_k_l_ks))
-        plt.show() # x coordinate is the number of rules, y coordinate is m_k * l_k
+        plot(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k') # x coordinate is the number of rules, y coordinate is m_k * l_k
         
-        epsilon = 0.5 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
+        epsilon = 0.1 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
         array = np.array(m_k_l_ks)
         indexes_to_rules_to_delete = np.where(array < epsilon)[0]
         print('There are %s fuzzy logic rules that will be deleted.' % len(indexes_to_rules_to_delete))
@@ -614,7 +574,7 @@ def main():
     c = np.array([-0.5, 0.5, -1])
     n_inputs = 4 # number of inputs
     n_neurons = 8 # number of neurons in the hidden layer
-    n_neurons = 4
+    # n_neurons = 4
     W = np.random.random(size=(n_neurons, n_inputs))
     b = np.random.random(size=(n_neurons,))
     c = np.random.random(size=(n_neurons,))
@@ -635,27 +595,6 @@ def iris_classification(f):
 ann, l, r = main()
 apfrb = ann.T()
 
-# for x in X_train:
-#     print(ann.forward(x))
-#     print(apfrb.inference(x))
-    
-# for x in X_test:
-#     print(ann.forward(x))
-#     print('frb')
-#     print(apfrb.inference(x))
-        
-def logistic_n(y, k):
-    return 1 / (1 + np.exp(2 * (y-k)))
-        
-def logistic_p(y, k):
-    return 1 / (1 + np.exp(-2 * (y-k)))
-
-def gaussian_n(y, k):
-    return np.exp(-1.0 * (pow(y - k[1], 2)) / (k[0] - k[1]))
-
-def gaussian_p(y, k):
-    return np.exp(-1.0 * (pow(y - k[0], 2)) / (k[0] - k[1]))
-
 # import some data to play with
 iris = datasets.load_iris()
 Z = iris.data[:, :4]  # we only take the first four features.
@@ -671,7 +610,6 @@ scaler.fit(X_train)
 X_train = scaler.transform(X_train)
 X_test = scaler.transform(X_test)
     
-
 def test(apfrb):     
     from sklearn.neural_network import MLPClassifier
     # mlp = MLPClassifier(hidden_layer_sizes=(10, 10, 10), max_iter=1000)
@@ -684,22 +622,4 @@ def test(apfrb):
     print(confusion_matrix(y_test,predictions))
     print(classification_report(y_test,predictions))
 
-a_0 = 1
-a_1 = 2.4
-
-x = 1.0
-k = 3.5
-g = a_0 + a_1 * np.tanh(x)
-f = (a_0 + a_1)*gaussian_n(x, [k, -k]) + (a_0 - a_1)*gaussian_p(x, [k, -k])
-f /= gaussian_n(x, [k, -k]) + gaussian_p(x, [k, -k])
-
-x = [1.0, 1.0]
-a_0 = 1.0
-a_1 = 1/3
-a_2 = 2/5
-x1_k = 5
-x2_k = [7, 1]
-g = a_0 + np.tanh(x[0] - 5)/3 + (2*(np.tanh(x[1] - 4)/5))
-input1 = (logistic_p(x[0], 5) - logistic_n(x[0], 5)) / (logistic_p(x[0], 5) + logistic_n(x[0], 5))
-input2 = (gaussian_p(x[1], x2_k) - gaussian_n(x[1], x2_k)) / (gaussian_p(x[1], x2_k) + gaussian_n(x[1], x2_k))
-f = a_0 + a_1 * input1 + a_2 * input2
+apfrb.simplify(X_train)
