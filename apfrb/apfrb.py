@@ -10,7 +10,7 @@ import time
 import itertools
 import numpy as np
 from rule import Rule
-from common import bar, plot
+from common import bar, line
 from copy import deepcopy
 from sklearn import datasets
 
@@ -205,8 +205,8 @@ class APFRB:
         None.
 
         """
-        self.W = np.delete(self.W, 1, axis=0)
-        self.v = np.delete(self.v, 1, axis=0)
+        self.W = np.delete(self.W, i, axis=0)
+        self.v = np.delete(self.v, i, axis=0)
         self.a = list(np.delete(self.a, i + 1, axis = 0))
         self.__reset()
     
@@ -437,7 +437,7 @@ class APFRB:
         
         # step 1
         yes = True
-        print('Would you like to remove an antecedent from the IF part? [y/n]')
+        print('\nWould you like to remove an antecedent from the IF part? [y/n]')
         yes = input().lower() == 'y'
         while(yes):    
             print('\nStep 1 in progress (this should be quick)...')
@@ -448,13 +448,13 @@ class APFRB:
                 print('\nHow many of the smallest values would you like to retrieve? [type \'cancel\' to skip Step 1]')
                 raw = input()
                 ans = int(raw)
-                print(sorted_a[:ans])
+                print('\n%s' % sorted_a[:ans])
             except Exception:
                 if raw.lower() == 'cancel':
-                    print('Skipping step 1.')
+                    print('\nSkipping step 1.')
                     break
                 else:
-                    print('Invalid response. Unsure of how to respond. Resetting step 1.')
+                    print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
                     continue
             
             try:
@@ -464,67 +464,68 @@ class APFRB:
                 small_val = sorted_a[ans]
                 temp = np.array([abs(x) for x in self.a[1:]])
                 small_val_indexes = np.where(temp <= small_val)[0]
-                # small_val_k = self.a.index(small_val)
+                print('\nDeleting up to, and including, a_i = %s...' % small_val)
             except Exception:
                 if raw.lower() == 'cancel':
-                    print('Skipping step 1.')
+                    print('\nSkipping step 1.')
                     break
                 else:
-                    print('Invalid response. Unsure of how to respond. Resetting step 1.')
+                    print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
                     continue
             
-            for index in small_val_indexes:
-                small_val_k = index + 1 # the index of x_k and a_k to be deleted
-                # small_val_k = self.a[index + 1] # add 1 to the index to skip over a_0 (required to keep)
-                for rule in self.rules:
-                    try:
-                        # try to delete all occurrences of x_k and a_k from any fuzzy logic rules
-                        del rule.antecedents[small_val_k]
-                        del rule.consequents[small_val_k]
-                    except KeyError:
-                        break
-                    
-            # iterate through the vector 'a', swapping out entries with NoneType to delete later
-            for index in small_val_indexes:
-                self.a[index + 1] = None
+            num_of_rules_to_delete = len(self.rules) - (len(self.rules) / (2 * len(small_val_indexes)))
+            print('\nConfirm the deletion of %s fuzzy logic rules (out of %s rules). [y/n]' % (num_of_rules_to_delete, len(self.rules)))
+            delete = input().lower() == 'y'
+            
+            if delete:
+                while small_val_indexes.any():
+                    index = small_val_indexes[0]
+                    self.__delete(index)
+                    temp = np.array([abs(x) for x in self.a[1:]])
+                    small_val_indexes = np.where(temp <= small_val)[0]
+
+            #     iterate through the vector 'a', swapping out entries with NoneType to delete later
+            #     TODO: unsure of this, but I believe that vector 'v' must also be cleaned as well
+            #     iterate through the vector 'v', swapping out entries with NoneType to delete later
+            #     self.a[index + 1] = None
+            #     self.v[index] = None
                 
-            # TODO: unsure of this, but I believe that vector 'v' must also be cleaned as well
-            # iterate through the vector 'v', swapping out entries with NoneType to delete later
-            for index in small_val_indexes:
-                self.v[index] = None
-                
-            while True:
-                try:
-                    self.a.remove(None)
-                except Exception:
-                    break
-                
-            while True:
-                try:
-                    self.v.remove(None)
-                except Exception:
-                    break
-                
-            for rule in self.rules:
-                rule.normalize_keys()
-                
+            #     small_val_k = index + 1 # the index of x_k and a_k to be deleted
+            #     for rule in self.rules:
+            #         try:
+            #             # try to delete all occurrences of x_k and a_k from any fuzzy logic rules
+            #             del rule.antecedents[small_val_k]
+            #             del rule.consequents[small_val_k]
+            #         except KeyError:
+            #             break
+            #         finally:
+            #             rule.normalize_keys()
+            
+            # while True:
+            #     try:
+            #         self.a.remove(None)
+            #         self.v.remove(None)
+            #     except Exception:
+            #         break
+        
+            print('\nThe All Permutations Rule Base now has %s rules.' % len(self.rules))
             print('\nWould you like to remove another antecedent from the IF part? [y/n]')
             yes = input().lower() == 'y'
             
         # step 2
-        print('Step 2 in progress (this might take awhile)...')
+        print('\nStep 2 in progress (this might take awhile)...')
         m_k_l_ks = []
         q = len(self.rules)
         for k in range(q):
             if k == q / 4:
                 current_time = time.time()
-                print('A quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+                print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
             elif k == q / 2:
                 current_time = time.time()
-                print('Halfway done [elapsed time: %s seconds]...' % (current_time - start_time))
+                print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
             elif k == 3 * q / 4:
                 current_time = time.time()
-                print('Three quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+                print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
             
             t_ks = []
             c_ks = []
@@ -535,12 +536,14 @@ class APFRB:
             m_k = max(t_ks)
             l_k = max(c_ks)
             m_k_l_ks.append(m_k * l_k)
-        plot(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k') # x coordinate is the number of rules, y coordinate is m_k * l_k
+        line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k') # x coordinate is the number of rules, y coordinate is m_k * l_k
         
-        epsilon = 0.1 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
+        print('\nThe five smallest m_k * l_k values: \n\n%s' % sorted(m_k_l_ks)[:5])
+        
+        epsilon = 0.3 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
         array = np.array(m_k_l_ks)
         indexes_to_rules_to_delete = np.where(array < epsilon)[0]
-        print('There are %s fuzzy logic rules that will be deleted.' % len(indexes_to_rules_to_delete))
+        print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indexes_to_rules_to_delete))
         # iterate through the rule base, swapping out rules with NoneType to delete later
         for rule_index in indexes_to_rules_to_delete:
             self.rules[rule_index] = None
@@ -573,7 +576,7 @@ def main():
     b = np.array([-7, -520, -11])
     c = np.array([-0.5, 0.5, -1])
     n_inputs = 4 # number of inputs
-    n_neurons = 8 # number of neurons in the hidden layer
+    n_neurons = 5 # number of neurons in the hidden layer
     # n_neurons = 4
     W = np.random.random(size=(n_neurons, n_inputs))
     b = np.random.random(size=(n_neurons,))
