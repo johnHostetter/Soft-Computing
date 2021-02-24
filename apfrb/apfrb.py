@@ -14,7 +14,7 @@ from common import bar, line
 from copy import deepcopy
 from sklearn import datasets
 
-np.random.seed(0)        
+np.random.seed(10)        
 
 class ANN:
     def __init__(self, W, b, c, beta):
@@ -275,6 +275,14 @@ class APFRB:
             d += self.rules[i].t(x)
         return d
     
+    def __b(self, x, k):
+        diffs = []
+        f_k = self.rules[k].t(x)
+        for i in range(len(self.rules)):
+            f_i = self.rules[i].t(x)
+            diffs.append(abs(f_i - f_k))
+        return max(diffs)
+            
     def predict(self, D, func):
         predictions = []
         for z in D:
@@ -429,6 +437,11 @@ class APFRB:
         
         step 2, for each rule k, compute m_k and l_k, 
         if m_k * l_k is small, then delete rule k from APFRB
+        
+        step 3, if e/r is small, then output f_k(x) instead of f(x)
+        
+        step 4, if a specific atom (e.g. "x_1 is smaller than 7")
+        appears in all the rules, then delete it from all of them
         """
         
         # TODO: Exception was thrown after being called twice - replicate and fix it
@@ -513,6 +526,7 @@ class APFRB:
             yes = input().lower() == 'y'
             
         # step 2
+        # converts the APFRB to a FLC
         print('\nStep 2 in progress (this might take awhile)...')
         m_k_l_ks = []
         q = len(self.rules)
@@ -547,12 +561,63 @@ class APFRB:
         # iterate through the rule base, swapping out rules with NoneType to delete later
         for rule_index in indexes_to_rules_to_delete:
             self.rules[rule_index] = None
+            self.table[rule_index] = None
         while True:
             try:
                 self.rules.remove(None)
+                self.table.remove(None)
             except Exception:
                 self.r = len(self.rules) # update the stored count of number of rules
                 break
+        
+        # step 3
+        # determines whether Mean of Maximum defuzzification can be used, if e / r is small enough
+        if False:
+            k = None
+            x = None
+            e_rs = []
+            
+            # NOTE: any x in the training set, D, can be used. Therefore, any arbitrary x can 
+            # be selected, and the for loop immediately below is not required.
+            for x in D:
+                xs = []
+                t_ks = []
+                for i in range(len(self.rules)):  
+                    rule_i = self.rules[i]
+                    t_ks.append(rule_i.t(x))
+                    xs.append(x)
+                    
+                # k(x) = argmax_i t_i(x)
+                k = t_ks.index(max(t_ks))
+                x_ = xs[k]
+                
+                # compute e
+                bs = []
+                for x in D:
+                    bs.append(self.__b(x, k))
+                e = max(bs)
+                
+                # compute r
+                vals = []
+                for x in D:
+                    t_k = self.rules[k].t(x)
+                    denominator = 0.0
+                    for i in range(len(self.rules)):
+                        if i != k:
+                            denominator += self.rules[i].t(x)
+                    vals.append(t_k / denominator)
+                r = 1.0 + min(vals)
+                e_rs.append(e/r)
+        
+        # step 4
+        table = np.matrix(self.table)
+        for i in self.table[0]:
+            if np.all(table[:,i] == table[:,i][0]):
+                print('\nDelete antecedent x_%s from all the rules.' % i)
+                # TODO: implement this step
+                
+            
+                
 def main():
     """
     The main function of this script.
@@ -572,12 +637,11 @@ def main():
         The number of fuzzy logic rules for all permutations.
 
     """
-    W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
-    b = np.array([-7, -520, -11])
-    c = np.array([-0.5, 0.5, -1])
+    # W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
+    # b = np.array([-7, -520, -11])
+    # c = np.array([-0.5, 0.5, -1])
     n_inputs = 4 # number of inputs
-    n_neurons = 5 # number of neurons in the hidden layer
-    # n_neurons = 4
+    n_neurons = 8 # number of neurons in the hidden layer
     W = np.random.random(size=(n_neurons, n_inputs))
     b = np.random.random(size=(n_neurons,))
     c = np.random.random(size=(n_neurons,))
@@ -624,5 +688,12 @@ def test(apfrb):
     from sklearn.metrics import classification_report, confusion_matrix
     print(confusion_matrix(y_test,predictions))
     print(classification_report(y_test,predictions))
+    
+def avg_error(apfrb, ann, D):
+    errors = []
+    for x in D:
+        errors.append(abs(apfrb.inference(x) - ann.forward(x)))
+    return np.mean(errors)
 
-apfrb.simplify(X_train)
+e_rs = apfrb.simplify(X_train)
+print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
