@@ -649,7 +649,6 @@ class APFRB:
         for rule in self.rules:
             flc_rules.append(rule.convert_to_flc_type())
         table = np.matrix(self.table)
-        ordered_rules = []
         for i in range(len(self.table[0])):
             col = np.squeeze(np.array(table[:,i]))
             uniqs, indexes, counts = np.unique(col, return_index=True, return_counts=True)
@@ -671,10 +670,8 @@ class APFRB:
                 # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
                 top_flc_rule = flc_rules.pop(argindex)        
                 top_flc_rule.else_clause = True
-                ordered_rules.insert(0, top_flc_rule)
-                
-        # return flc_rules
-        
+                flc_rules.insert(0, top_flc_rule)
+                        
         # step 6, classification only
         consequent_frequency = {} # find the frequency for each rule's consequent term
         for flc_rule in flc_rules:
@@ -700,7 +697,7 @@ class APFRB:
                 break
         flc_rules.append(ElseRule(max_freq_key))
         
-        # step 7, 
+        # step 7
         
         return flc_rules
                 

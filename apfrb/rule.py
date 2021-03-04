@@ -15,9 +15,9 @@ class LogisticTerm:
         self.type = neg_or_pos
     def __str__(self):
         if self.type == "+":
-            return ("greater than %s" % self.k)  
+            return ("larger than %s" % self.k)  
         else:
-            return ("less than %s" % self.k)
+            return ("smaller than %s" % self.k)
     def mu(self, x):
         return self.logistic(x, self.k, self.type)
     def logistic(self, y, k, t='-'):
