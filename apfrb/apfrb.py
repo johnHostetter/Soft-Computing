@@ -9,12 +9,31 @@ Created on Wed Feb 17 00:49:48 2021
 import time
 import itertools
 import numpy as np
-from rule import Rule
+from rule import Rule, ElseRule
 from common import bar, line
 from copy import deepcopy
 from sklearn import datasets
 
-np.random.seed(10)        
+np.random.seed(10)     
+
+# class FLC:
+#     def __init__(self, apfrb):
+#         """
+#         Create a Type-1 Singleton Fuzzy Logic Controller (FLC).
+
+#         Parameters
+#         ----------
+#         apfrb : APFRB
+#             All Permutations Fuzzy Rule Base.
+
+#         Returns
+#         -------
+#         None.
+
+#         """
+#         self.rules = self.convert_rules(apfrb.rules)
+#     def convert_rules(self, rules):
+#         pass
 
 class ANN:
     def __init__(self, W, b, c, beta):
@@ -426,9 +445,15 @@ class APFRB:
 
         """
         beta = self.a[0] # fetching the output node's bias
-        b = -1.0 * self.v # returning the biases to their original value
+        try:
+            b = -1.0 * self.v # returning the biases to their original value
+        except TypeError: # self.v is saved as a sequence instead of a numpy array
+            b = -1.0 * np.array(self.v)
         c = self.a[1:] # fetching the weights between the hidden layer and the output node
         return ANN(self.W, b, c, beta)
+    
+    def T_flc(self):
+        pass
     
     def simplify(self, D):
         """ step 1, for each k, if the abs(a_k) is small, 
@@ -437,6 +462,7 @@ class APFRB:
         
         step 2, for each rule k, compute m_k and l_k, 
         if m_k * l_k is small, then delete rule k from APFRB
+        (WARNING: this results in a Fuzzy Logic Controller)
         
         step 3, if e/r is small, then output f_k(x) instead of f(x)
         
@@ -611,12 +637,72 @@ class APFRB:
         
         # step 4
         table = np.matrix(self.table)
-        for i in self.table[0]:
+        for i in range(len(self.table[0])):
             if np.all(table[:,i] == table[:,i][0]):
                 print('\nDelete antecedent x_%s from all the rules.' % i)
                 # TODO: implement this step
                 
-            
+        # step 5
+        # beyond this point, inference no longer works
+        # TODO: fix fuzzy logic inference
+        flc_rules = []
+        for rule in self.rules:
+            flc_rules.append(rule.convert_to_flc_type())
+        table = np.matrix(self.table)
+        ordered_rules = []
+        for i in range(len(self.table[0])):
+            col = np.squeeze(np.array(table[:,i]))
+            uniqs, indexes, counts = np.unique(col, return_index=True, return_counts=True)
+            argmin = np.argmin(counts)
+            argindex = indexes[np.argmin(counts)]
+            if argmin == 1:
+                least_occurring_term = uniqs[np.argmin(counts)]
+                for flc_rule in flc_rules:
+                    # i + 1 since the count for i begins from zero, but antecedents are indexed
+                    # starting from 1 in rule base. The antecedent type of a FLC rule is stored 
+                    # as a string, either "-" or "+", but is stored as a boolean in APFRB rule.
+                    # Thus, flc_rule.antecedents[i + 1].type == "+" converts the string representation
+                    # back to its boolean equivalent, and if least occurring term is True, then the 
+                    # term+ linguistic term is the least occurring term.
+                    if flc_rule.antecedents[i + 1].type == '+' and least_occurring_term:
+                        continue # do not delete the least occurring term from the rule
+                    else:
+                        del flc_rule.antecedents[i + 1]
+                # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
+                top_flc_rule = flc_rules.pop(argindex)        
+                top_flc_rule.else_clause = True
+                ordered_rules.insert(0, top_flc_rule)
+                
+        # return flc_rules
+        
+        # step 6, classification only
+        consequent_frequency = {} # find the frequency for each rule's consequent term
+        for flc_rule in flc_rules:
+            try:
+                consequent_frequency[flc_rule.consequent] += 1
+            except KeyError:
+                consequent_frequency[flc_rule.consequent] = 1
+        # return the dictionary key that has the maximum value
+        # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
+        max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
+        # import operator
+        # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
+        
+        index = 0
+        while True:
+            if index < len(flc_rules):
+                flc_rule = flc_rules[index]
+                if flc_rule.consequent == max_freq_key:
+                    flc_rules.pop(index)
+                else:
+                    index += 1
+            else:
+                break
+        flc_rules.append(ElseRule(max_freq_key))
+        
+        # step 7, 
+        
+        return flc_rules
                 
 def main():
     """
@@ -637,14 +723,14 @@ def main():
         The number of fuzzy logic rules for all permutations.
 
     """
-    # W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
-    # b = np.array([-7, -520, -11])
-    # c = np.array([-0.5, 0.5, -1])
-    n_inputs = 4 # number of inputs
-    n_neurons = 8 # number of neurons in the hidden layer
-    W = np.random.random(size=(n_neurons, n_inputs))
-    b = np.random.random(size=(n_neurons,))
-    c = np.random.random(size=(n_neurons,))
+    W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
+    b = np.array([-7, -520, -11])
+    c = np.array([-0.5, 0.5, -1])
+    # n_inputs = 4 # number of inputs
+    # n_neurons = 8 # number of neurons in the hidden layer
+    # W = np.random.random(size=(n_neurons, n_inputs))
+    # b = np.random.random(size=(n_neurons,))
+    # c = np.random.random(size=(n_neurons,))
     if len(b) != len(c):
         raise Exception('The vector \'b\' must equal the vector \'c\'.')
     l = len(W) # the number of antecedents in the fuzzy logic rules will be equal to the length of the column entries in W
@@ -695,5 +781,6 @@ def avg_error(apfrb, ann, D):
         errors.append(abs(apfrb.inference(x) - ann.forward(x)))
     return np.mean(errors)
 
-e_rs = apfrb.simplify(X_train)
+flc_rules = apfrb.simplify(X_train)
 print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
+test(apfrb)

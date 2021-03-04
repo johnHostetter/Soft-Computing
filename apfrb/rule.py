@@ -9,6 +9,85 @@ Created on Sun Feb 21 21:51:30 2021
 import numpy as np
 from common import subs
 
+class LogisticTerm:
+    def __init__(self, k, neg_or_pos):
+        self.k = k
+        self.type = neg_or_pos
+    def __str__(self):
+        if self.type == "+":
+            return ("greater than %s" % self.k)  
+        else:
+            return ("less than %s" % self.k)
+    def mu(self, x):
+        return self.logistic(x, self.k, self.type)
+    def logistic(self, y, k, t='-'):
+        """
+        The logistic membership function.
+
+        Parameters
+        ----------
+        y : float
+            The input.
+        k : float
+            The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
+        t : string, optional
+            Adjusts whether this logistic membership function is describing term- or term+. 
+            The default is '-'.
+
+        Returns
+        -------
+        float
+            The degree of membership.
+
+        """
+        val = 2.0
+        if t == '+':
+            val = -2.0
+        return 1.0 / (1.0 + np.exp(val * (y-k)))
+
+class ElseRule:
+    def __init__(self, consequent):
+        self.consequent = consequent
+    def __str__(self):
+        return 'ELSE %s' % self.consequent
+
+class FLC_Rule:
+    def __init__(self, antecedents, consequent):
+        self.antecedents = antecedents
+        self.consequent = consequent
+        self.else_clause = False # by default is False, but may become True when rule ordering matters
+    def __str__(self):
+        output = 'IF'
+        iterations = 0
+        limit = len(self.antecedents.keys())
+        for key in self.antecedents.keys():
+            antecedent = self.antecedents[key]
+            output += ' X_%s is ' % key
+            output += str(antecedent)
+            if iterations < limit - 1:
+                output += ' AND'
+            iterations += 1
+        temp = (' THEN f(x) = %s' % self.consequent)
+        output += temp
+        if self.else_clause:
+            output += ' ELSE '
+        return output
+    def t(self, x):
+        """
+        Calculates the degree of firing for this rule.
+
+        Parameters
+        ----------
+        x : dictionary
+            The FLC's input.
+
+        Returns
+        -------
+        None.
+
+        """
+        pass
+
 class Rule:
     def __init__(self, antecedents, consequents, lookup, W, v):
         self.antecedents = antecedents # dictionary
@@ -94,6 +173,20 @@ class Rule:
             else:
                 degree *= self.logistic(y, k)
         return degree
+    
+    def convert_to_flc_type(self):
+        antecedents = {}
+        indexes = list(self.antecedents.keys())
+        values = list(self.antecedents.values())
+        for loop_idx in range(len(values)):
+            index = indexes[loop_idx]
+            entry = values[loop_idx]
+            k = self.v[index - 1]
+            if entry:
+                antecedents[index] = LogisticTerm(k, '+')
+            else:
+                antecedents[index] = LogisticTerm(k, '-')
+        return FLC_Rule(antecedents, self.consequent())
                 
     def logistic(self, y, k, t='-'):
         """
