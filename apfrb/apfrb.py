@@ -14,6 +14,8 @@ from common import bar, line
 from copy import deepcopy
 from sklearn import datasets
 
+import sympy as sp
+
 np.random.seed(10)     
 
 # class FLC:
@@ -634,27 +636,34 @@ class APFRB:
                     vals.append(t_k / denominator)
                 r = 1.0 + min(vals)
                 e_rs.append(e/r)
-        
-        # step 4
-        table = np.matrix(self.table)
-        for i in range(len(self.table[0])):
-            if np.all(table[:,i] == table[:,i][0]):
-                print('\nDelete antecedent x_%s from all the rules.' % i)
-                # TODO: implement this step
                 
-        # step 5
         # beyond this point, inference no longer works
         # TODO: fix fuzzy logic inference
         flc_rules = []
         for rule in self.rules:
             flc_rules.append(rule.convert_to_flc_type())
-        table = np.matrix(self.table)
-        for i in range(len(self.table[0])):
+        
+        # step 4
+        table = np.matrix(self.table) # TODO: update self.table so it is consistent with the new table
+        # for i in range(len(self.table[0])):
+        i = 0
+        while i < len(table[0]):
+            if np.all(table[:,i] == table[:,i][0]):
+                print('\nDelete antecedent x_%s from all the rules.' % i)
+                for flc_rule in flc_rules:
+                    del flc_rule.antecedents[i + 1]
+                table = np.delete(table, i, axis=1)
+            else:
+                i += 1
+            
+        # step 5                
+        # table = np.matrix(self.table)
+        for i in range(len(np.squeeze(np.asarray(table))[0])):
             col = np.squeeze(np.array(table[:,i]))
             uniqs, indexes, counts = np.unique(col, return_index=True, return_counts=True)
             argmin = np.argmin(counts)
             argindex = indexes[np.argmin(counts)]
-            if argmin == 1:
+            if min(counts) == 1:
                 least_occurring_term = uniqs[np.argmin(counts)]
                 for flc_rule in flc_rules:
                     # i + 1 since the count for i begins from zero, but antecedents are indexed
@@ -663,10 +672,16 @@ class APFRB:
                     # Thus, flc_rule.antecedents[i + 1].type == "+" converts the string representation
                     # back to its boolean equivalent, and if least occurring term is True, then the 
                     # term+ linguistic term is the least occurring term.
-                    if flc_rule.antecedents[i + 1].type == '+' and least_occurring_term:
-                        continue # do not delete the least occurring term from the rule
-                    else:
-                        del flc_rule.antecedents[i + 1]
+                    try:
+                        key = list(flc_rule.antecedents.keys())[i] # assumes the antecedents' keys are kept "in order"
+                        if flc_rule.antecedents[key].type == '+' and least_occurring_term:
+                            continue # do not delete the least occurring term from the rule
+                        else:
+                            del flc_rule.antecedents[key]
+                    except IndexError:
+                        # TODO: this likely needs to be fixed, most likely the identification of 
+                        # antecedents in the fuzzy logic rules has some logic error that needs addressed
+                        print('IndexError was thrown.')
                 # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
                 top_flc_rule = flc_rules.pop(argindex)        
                 top_flc_rule.else_clause = True
@@ -699,7 +714,115 @@ class APFRB:
         
         # step 7
         
-        return flc_rules
+        matrix = np.asmatrix(D)
+        intervals = []
+        for col_idx in range(len(D[0])):
+            interval = (np.ndarray.item(min(matrix[:,col_idx])), 
+                        np.ndarray.item(max(matrix[:,col_idx])))
+            intervals.append(interval)
+            
+        weights = deepcopy(self.W)
+        
+        import sympy as sp
+        from sympy.solvers import solve
+        from sympy import Symbol
+        
+        # get the number of raw inputs
+        n = self.n
+        argument = 'z_1:%s' % n
+        # generate n number of normalized z's to use for the upcoming equation reduction
+        z = sp.symbols(argument) # z is a list of size n containing all z_i variables
+        
+        
+        # get the number of antecedents
+        l = self.l
+        equations = []
+        for j in range(l):
+            equation = ''
+            row_of_weights = weights[j]
+            for i in range(n):
+                # z_i = z[i]
+                equation += ('Symbol("z[%s]")' % i)
+                equation += ('*(%s)' % str(row_of_weights[i]))
+                interval = intervals[i]
+                minimum = interval[0]
+                maximum = interval[1]
+                equation += ('*(%s)' % str(maximum - minimum))
+                equation += '+'
+                equation += ('(%s)' % str(minimum))
+                equation += ('*(%s)' % str(row_of_weights[i]))
+                if i + 1 < n:
+                    equation += '+'
+            equations.append(equation)
+        
+        parsed_expressions = []
+        reduced_expressions = []
+        for equation in equations:
+            parsed_expressions.append(sp.parse_expr(equation))
+            # parsed_expressions.append(sp.sympify(equation)) # this also works
+            
+            # get the coefficients from the equation, ignore the last coefficient in the list returned,
+            # it is the constant that is not being multiplied by any normalized z_i
+            coefficients = sp.Poly(equation).coeffs()
+            # coefficients = sp.Poly(sp.sympify(equation)).coeffs() # this also works
+            coefficients = coefficients[:-1] # ignoring the last coefficient since it is not multiplied by any symbol
+            max_coeff = max(coefficients, key=abs) # get the largest coefficient and keep it
+            z_idx = coefficients.index(max_coeff) + 1 # since the z_i count from 1 to n, we add plus 1
+            
+            # # create reduced expression
+            # reduced_expression = ''
+            # reduced_expression += ('%s' % max_coeff)
+            # reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+            # reduced_expressions.append(reduced_expression)
+            
+            # obtain remainder of expression
+            removed_part_of_expression = sp.parse_expr(equation)
+            arg = 'z[%s]' % (z_idx - 1)
+            # substitute the non-important weights/terms with zero
+            removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
+                    
+            print(sp.sympify(removed_part_of_expression))
+            
+            summation = 0.0
+            for observation in D:
+                for i in range(len(observation)):
+                    z_i = observation[i]
+                    arg = 'z[%s]' % (i)
+                    interval = intervals[i]
+                    minimum = interval[0]
+                    maximum = interval[1]
+                    norm_z_i = (z_i - minimum) / (maximum - minimum)
+                    removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), norm_z_i)
+                summation += float(removed_part_of_expression)
+            summation /= len(D)
+            
+            # create reduced expression
+            reduced_expression = ''
+            reduced_expression += ('%s' % max_coeff)
+            reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+            reduced_expression += ('+%s' % summation)
+            reduced_expressions.append(reduced_expression)
+            
+            # for i in range(n):
+            #     if i == (z_idx - 1):
+            #         # create reduced expression
+            #         reduced_expression = ''
+            #         reduced_expression += ('%s' % max_coeff)
+            #         reduced_expression += ('*Symbol("z[%s]")' % i)
+            #         reduced_expressions.append(reduced_expression)
+            #     else:
+            #         # obtain remainder of expression
+            #         removed_part_of_expression = deepcopy(sp.parse_expr(equation))
+            #         arg = 'z[%s]' % i
+            #         # substitute the non-important weights/terms with zero
+            #         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
+                    
+            # print(sp.sympify(removed_part_of_expression))
+            
+        return flc_rules, intervals, equations, reduced_expressions
+    
+def norm_z(z, z_min, z_max):
+    return (z - z_min) / (z - z_max)
                 
 def main():
     """
@@ -723,8 +846,8 @@ def main():
     W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
     b = np.array([-7, -520, -11])
     c = np.array([-0.5, 0.5, -1])
-    # n_inputs = 4 # number of inputs
-    # n_neurons = 8 # number of neurons in the hidden layer
+    # n_inputs = 140 # number of inputs, has no impact on program executability
+    # n_neurons = 21 # number of neurons in the hidden layer, maximum number of neurons this can handle is 21
     # W = np.random.random(size=(n_neurons, n_inputs))
     # b = np.random.random(size=(n_neurons,))
     # c = np.random.random(size=(n_neurons,))
@@ -744,10 +867,12 @@ def iris_classification(f):
 
 ann, l, r = main()
 apfrb = ann.T()
+print(apfrb.r)
 
 # import some data to play with
 iris = datasets.load_iris()
 Z = iris.data[:, :4]  # we only take the first four features.
+Z = np.flip(Z, axis = 1)
 y = iris.target - 1 # target values that match APFRB paper
 
 from sklearn.model_selection import train_test_split
@@ -778,6 +903,13 @@ def avg_error(apfrb, ann, D):
         errors.append(abs(apfrb.inference(x) - ann.forward(x)))
     return np.mean(errors)
 
-flc_rules = apfrb.simplify(X_train)
-print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
-test(apfrb)
+def read(equations):
+    for equation in equations:
+        print(sp.sympify(equation))
+
+# flc_rules, zs, equations, reduced_expressions = apfrb.simplify(Z)
+# print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
+# test(apfrb)
+
+# for i in range(len(flc_rules)):
+#     print(flc_rules[i])
