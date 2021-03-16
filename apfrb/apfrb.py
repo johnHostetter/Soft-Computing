@@ -127,7 +127,8 @@ class APFRB:
         self.v = list(v) # a vector of size m describing the biases for the ANN's hidden layer
         self.a = a # a vector of size m + 1 (since it includes a_0 - the output node's bias)
         self.__reset() # reset/initialize all the variables that are dependent upon 'W', 'v' or 'a'
-    
+        self.d_memo = {}
+        
     def __str__(self):
         """
         Get the Fuzzy Rule Base as a list of strings.
@@ -290,11 +291,16 @@ class APFRB:
             DESCRIPTION.
 
         """
-        d = 0.0
-        q = self.r
-        for i in range(q):
-            d += self.rules[i].t(x)
-        return d
+        key = hash(tuple(map(float, x)))
+        try:
+            return self.d_memo[key]
+        except KeyError:
+            d = 0.0
+            q = self.r
+            for i in range(q):
+                d += self.rules[i].t(x)
+            self.d_memo[key] = d
+            return d
     
     def __b(self, x, k):
         diffs = []
@@ -504,7 +510,7 @@ class APFRB:
                 ans = int(raw)
                 small_val = sorted_a[ans]
                 temp = np.array([abs(x) for x in self.a[1:]])
-                small_val_indexes = np.where(temp <= small_val)[0]
+                small_val_indices = np.where(temp <= small_val)[0]
                 print('\nDeleting up to, and including, a_i = %s...' % small_val)
             except Exception:
                 if raw.lower() == 'cancel':
@@ -514,40 +520,16 @@ class APFRB:
                     print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
                     continue
             
-            num_of_rules_to_delete = len(self.rules) - (len(self.rules) / (2 * len(small_val_indexes)))
+            num_of_rules_to_delete = len(self.rules) - (len(self.rules) / (2 * len(small_val_indices)))
             print('\nConfirm the deletion of %s fuzzy logic rules (out of %s rules). [y/n]' % (num_of_rules_to_delete, len(self.rules)))
             delete = input().lower() == 'y'
             
             if delete:
-                while small_val_indexes.any():
-                    index = small_val_indexes[0]
+                while small_val_indices.any():
+                    index = small_val_indices[0]
                     self.__delete(index)
                     temp = np.array([abs(x) for x in self.a[1:]])
-                    small_val_indexes = np.where(temp <= small_val)[0]
-
-            #     iterate through the vector 'a', swapping out entries with NoneType to delete later
-            #     TODO: unsure of this, but I believe that vector 'v' must also be cleaned as well
-            #     iterate through the vector 'v', swapping out entries with NoneType to delete later
-            #     self.a[index + 1] = None
-            #     self.v[index] = None
-                
-            #     small_val_k = index + 1 # the index of x_k and a_k to be deleted
-            #     for rule in self.rules:
-            #         try:
-            #             # try to delete all occurrences of x_k and a_k from any fuzzy logic rules
-            #             del rule.antecedents[small_val_k]
-            #             del rule.consequents[small_val_k]
-            #         except KeyError:
-            #             break
-            #         finally:
-            #             rule.normalize_keys()
-            
-            # while True:
-            #     try:
-            #         self.a.remove(None)
-            #         self.v.remove(None)
-            #     except Exception:
-            #         break
+                    small_val_indices = np.where(temp <= small_val)[0]
         
             print('\nThe All Permutations Rule Base now has %s rules.' % len(self.rules))
             print('\nWould you like to remove another antecedent from the IF part? [y/n]')
@@ -584,10 +566,10 @@ class APFRB:
         
         epsilon = 0.3 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
         array = np.array(m_k_l_ks)
-        indexes_to_rules_to_delete = np.where(array < epsilon)[0]
-        print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indexes_to_rules_to_delete))
+        indices_to_rules_to_delete = np.where(array < epsilon)[0]
+        print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indices_to_rules_to_delete))
         # iterate through the rule base, swapping out rules with NoneType to delete later
-        for rule_index in indexes_to_rules_to_delete:
+        for rule_index in indices_to_rules_to_delete:
             self.rules[rule_index] = None
             self.table[rule_index] = None
         while True:
@@ -660,9 +642,9 @@ class APFRB:
         # table = np.matrix(self.table)
         for i in range(len(np.squeeze(np.asarray(table))[0])):
             col = np.squeeze(np.array(table[:,i]))
-            uniqs, indexes, counts = np.unique(col, return_index=True, return_counts=True)
+            uniqs, indices, counts = np.unique(col, return_index=True, return_counts=True)
             argmin = np.argmin(counts)
-            argindex = indexes[np.argmin(counts)]
+            argindex = indices[np.argmin(counts)]
             if min(counts) == 1:
                 least_occurring_term = uniqs[np.argmin(counts)]
                 for flc_rule in flc_rules:
@@ -846,11 +828,11 @@ def main():
     W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
     b = np.array([-7, -520, -11])
     c = np.array([-0.5, 0.5, -1])
-    # n_inputs = 140 # number of inputs, has no impact on program executability
-    # n_neurons = 21 # number of neurons in the hidden layer, maximum number of neurons this can handle is 21
-    # W = np.random.random(size=(n_neurons, n_inputs))
-    # b = np.random.random(size=(n_neurons,))
-    # c = np.random.random(size=(n_neurons,))
+    n_inputs = 4 # number of inputs, has no impact on program executability
+    n_neurons = 8 # number of neurons in the hidden layer, maximum number of neurons this can handle is 21
+    W = np.random.random(size=(n_neurons, n_inputs))
+    b = np.random.random(size=(n_neurons,))
+    c = np.random.random(size=(n_neurons,))
     if len(b) != len(c):
         raise Exception('The vector \'b\' must equal the vector \'c\'.')
     l = len(W) # the number of antecedents in the fuzzy logic rules will be equal to the length of the column entries in W
@@ -886,7 +868,7 @@ X_train = scaler.transform(X_train)
 X_test = scaler.transform(X_test)
     
 def test(apfrb):     
-    from sklearn.neural_network import MLPClassifier
+    from snklearn.neural_network import MLPClassifier
     # mlp = MLPClassifier(hidden_layer_sizes=(10, 10, 10), max_iter=1000)
     mlp = MLPClassifier(hidden_layer_sizes=(3,), max_iter=1000)
     mlp.fit(X_train, y_train)
@@ -906,6 +888,11 @@ def avg_error(apfrb, ann, D):
 def read(equations):
     for equation in equations:
         print(sp.sympify(equation))
+
+start = time.time()
+apfrb.simplify(Z)
+end = time.time()
+print(end-start)
 
 # flc_rules, zs, equations, reduced_expressions = apfrb.simplify(Z)
 # print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))

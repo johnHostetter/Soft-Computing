@@ -95,6 +95,7 @@ class Rule:
         self.lookup = lookup # lookup table for the term's linguistic meaning
         self.W = W
         self.v = v
+        self.memo = {}
     
     def __str__(self):
         """
@@ -106,7 +107,7 @@ class Rule:
             A string representation of the fuzzy logic rule.
 
         """
-        indexes = list(self.antecedents.keys())
+        indices = list(self.antecedents.keys())
         values = list(self.antecedents.values())
         
         a = list(self.consequents.values())
@@ -114,7 +115,7 @@ class Rule:
         consequent = a[0] + np.dot(signs, a[1:]) # TODO: consider storing the consequent in the rule
         output = 'IF '
         for loop_idx in range(len(values)):
-            index = indexes[loop_idx]
+            index = indices[loop_idx]
             entry = values[loop_idx]
             if entry: # term+ is present
                 output += ('x_%s is %s %.2f ' % (index, self.lookup[index - 1][1], self.v[index - 1]))
@@ -159,27 +160,32 @@ class Rule:
         None.
 
         """
-        degree = 1.0
-        indexes = list(self.antecedents.keys())
-        values = list(self.antecedents.values())
-        for loop_idx in range(len(values)):
-            index = indexes[loop_idx]
-            entry = values[loop_idx]
-            # y = x[index - 1]
-            y = np.dot(self.W[index - 1].T, z)
-            k = self.v[index - 1]
-            if entry:
-                degree *= self.logistic(y, k, '+')
-            else:
-                degree *= self.logistic(y, k)
-        return degree
+        key = hash(tuple(map(float, z)))
+        try:
+            return self.memo[key]
+        except KeyError:
+            degree = 1.0
+            indices = list(self.antecedents.keys())
+            values = list(self.antecedents.values())
+            for loop_idx in range(len(values)):
+                index = indices[loop_idx]
+                entry = values[loop_idx]
+                # y = x[index - 1]
+                y = np.dot(self.W[index - 1].T, z)
+                k = self.v[index - 1]
+                if entry:
+                    degree *= self.logistic(y, k, '+')
+                else:
+                    degree *= self.logistic(y, k)
+            self.memo[key] = degree
+            return degree
     
     def convert_to_flc_type(self):
         antecedents = {}
-        indexes = list(self.antecedents.keys())
+        indices = list(self.antecedents.keys())
         values = list(self.antecedents.values())
         for loop_idx in range(len(values)):
-            index = indexes[loop_idx]
+            index = indices[loop_idx]
             entry = values[loop_idx]
             k = self.v[index - 1]
             if entry:
