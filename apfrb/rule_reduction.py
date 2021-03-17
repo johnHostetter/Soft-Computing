@@ -7,11 +7,8 @@ Created on Wed Mar 17 16:54:08 2021
 """
 
 import time
-import itertools
 import numpy as np
-import sympy as sp
 from copy import deepcopy
-from sklearn import datasets
 from functools import partial
 from multiprocessing import Pool
 

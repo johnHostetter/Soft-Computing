@@ -6,21 +6,14 @@ Created on Wed Mar 17 17:04:00 2021
 @author: john
 """
 
-import time
 import itertools
 import numpy as np
 from copy import deepcopy
-from functools import partial
-from multiprocessing import Pool
 
 try:
-    from .ann import ANN
-    from .common import bar, line
-    from .rule import Rule, ElseRule
+    from .rule import Rule
 except ImportError:
-    from ann import ANN
-    from common import bar, line
-    from rule import Rule, ElseRule
+    from rule import Rule
 
 class APFRB:
     def __init__(self, W, v, a):

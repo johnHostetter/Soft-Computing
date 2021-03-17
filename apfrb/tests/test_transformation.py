@@ -7,7 +7,6 @@ Created on Wed Mar 17 17:34:13 2021
 """
 
 import unittest
-import numpy as np
 
 from apfrb.ann import iris_ann, ANN
 from apfrb.apfrb import APFRB
