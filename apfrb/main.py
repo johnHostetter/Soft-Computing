@@ -328,44 +328,6 @@ class APFRB:
             val = -2.0
         return 1.0 / (1.0 + np.exp(val * (y-k)))
 
-    def gaussian_n(y, k):
-        """
-        The term- of Gaussian membership function.
-
-        Parameters
-        ----------
-        y : TYPE
-            DESCRIPTION.
-        k : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
-
-        """
-        return np.exp(-1.0 * (pow(y - k[1], 2)) / (k[0] - k[1]))
-
-    def gaussian_p(y, k):
-        """
-        The term+ of Gaussian membership function.
-
-        Parameters
-        ----------
-        y : TYPE
-            DESCRIPTION.
-        k : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
-
-        """
-        return np.exp(-1.0 * (pow(y - k[0], 2)) / (k[0] - k[1]))
-
     def T_inv(self):
 
         """
