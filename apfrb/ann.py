@@ -8,11 +8,6 @@ Created on Wed Mar 17 16:48:59 2021
 
 import numpy as np
 
-try:
-    from .main import APFRB
-except ImportError:
-    from main import APFRB
-
 class ANN:
     def __init__(self, W, b, c, beta):
         """
@@ -62,19 +57,3 @@ class ANN:
             y.append(np.dot(self.W[j].T, z))
             f += self.c[j] * np.tanh(y[j] + self.b[j])
         return f
-
-    def T(self):
-        """
-        Defines the transformation between ANN to APFRB.
-
-        Returns
-        -------
-        APFRB
-            This ANN's equivalent APFRB.
-
-        """
-        a_0 = self.beta # assuming activation function is tanh
-        a = [a_0]
-        a.extend(self.c)
-        v = -1.0 * self.b
-        return APFRB(self.W, v, a)
