@@ -56,6 +56,6 @@ if __name__ == '__main__':
 
     start = time.time()
     ruleReducer = RuleReducer(apfrb)
-    ruleReducer.simplify(Z)
+    print(ruleReducer.simplify(Z, MULTIPROCESSING=False))
     end = time.time()
     print(end-start)

@@ -7,6 +7,7 @@ Created on Wed Mar 17 16:54:08 2021
 """
 
 import time
+import itertools
 import numpy as np
 from copy import deepcopy
 from functools import partial
@@ -18,13 +19,105 @@ try:
 except ImportError:
     from common import bar, line
     from rule import ElseRule
+    
+# def chunks(lst, n):
+#     """
+#     Yield successive n-sized chunks from lst.
 
+#     Parameters
+#     ----------
+#     lst : list
+#         The list that should be divided into n-sized chunks.
+#     n : int
+#         DESCRIPTION.
+
+#     Yields
+#     ------
+#     TYPE
+#         DESCRIPTION.
+
+#     """
+#     for i in range(0, len(lst), n):
+#         yield lst[i:i + n]
 
 class RuleReducer:
     def __init__(self, apfrb):
         self.apfrb = apfrb
-    def step_2(self, rules, data):
-        print('\nStep 2 in progress (this might take awhile)...')
+        
+    def step_1(self, skip=True):
+        """
+        For each k, if the abs(a_k) is small,
+        remove the atoms containing x_k in the IF part,
+        and remove a_k from the THEN part of all the rules
+
+        Parameters
+        ----------
+        skip : bool, optional
+            Controls whether to enable this step in the simplification process. The default is True.
+
+        Returns
+        -------
+        None.
+
+        """
+        if not skip:
+            print('\nStep 1 in progress (this requires your attention)...')
+            yes = True
+            print('\nWould you like to remove an antecedent from the IF part? [y/n]')
+            yes = input().lower() == 'y'
+            while(yes):
+                print('\nStep 1 in progress (this should be quick)...')
+                sorted_a = sorted([abs(x) for x in self.apfrb.a[1:]]) # ignore the output node bias, find absolute values, and sort
+                bar(range(len(sorted_a)), sorted_a, 'The values of a_k', 'The size of vector a (except a_0)', 'The value of a_i (where 0 < i <= m)')
+    
+                try:
+                    print('\nHow many of the smallest values would you like to retrieve? [type \'cancel\' to skip Step 1]')
+                    raw = input()
+                    ans = int(raw)
+                    print('\n%s' % sorted_a[:ans])
+                except Exception:
+                    if raw.lower() == 'cancel':
+                        print('\nSkipping step 1.')
+                        break
+                    else:
+                        print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
+                        continue
+    
+                try:
+                    print('\nUp to and including which value\'s index would you like to remove until? [type \'cancel\' to skip Step 1]')
+                    raw = input()
+                    ans = int(raw)
+                    small_val = sorted_a[ans]
+                    temp = np.array([abs(x) for x in self.a[1:]])
+                    small_val_indices = np.where(temp <= small_val)[0]
+                    print('\nDeleting up to, and including, a_i = %s...' % small_val)
+                except Exception:
+                    if raw.lower() == 'cancel':
+                        print('\nSkipping step 1.')
+                        break
+                    else:
+                        print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
+                        continue
+    
+                num_of_rules_to_delete = len(self.rules) - (len(self.rules) / (2 * len(small_val_indices)))
+                print('\nConfirm the deletion of %s fuzzy logic rules (out of %s rules). [y/n]' % (num_of_rules_to_delete, len(self.rules)))
+                delete = input().lower() == 'y'
+    
+                if delete:
+                    while small_val_indices.any():
+                        index = small_val_indices[0]
+                        self.__delete(index)
+                        temp = np.array([abs(x) for x in self.a[1:]])
+                        small_val_indices = np.where(temp <= small_val)[0]
+    
+                print('\nThe All Permutations Rule Base now has %s rules.' % len(self.rules))
+                print('\nWould you like to remove another antecedent from the IF part? [y/n]')
+                yes = input().lower() == 'y'
+        else:
+            print('\nSkipping step 1...')
+                
+    def __determine_rule_activations(self, rules, data):
+        print('\nDetermine rule activations')
         start_time = time.time()
         m_k_l_ks = []
         q = len(rules)
@@ -44,20 +137,78 @@ class RuleReducer:
             rule_k = rules[k]
             for z in data:
                 t_ks.append(rule_k.t(z))
-                c_ks.append(self.__c_k(z, k))
+                c_ks.append(self.apfrb.c_k(z, k))
             m_k = max(t_ks)
             l_k = max(c_ks)
             m_k_l_ks.append(m_k * l_k)
         return m_k_l_ks
-    def simplify(self, Z, MULTIPROCESSING=False):
-        """ step 1, for each k, if the abs(a_k) is small,
-        remove the atoms containing x_k in the IF part,
-        and remove a_k from the THEN part of all the rules
-
-        step 2, for each rule k, compute m_k and l_k,
+    
+    def __delete_rules_by_indices(self, indices):
+        # iterate through the rule base, swapping out rules with NoneType to delete later
+        for rule_index in indices:
+            self.apfrb.rules[rule_index] = None
+            self.apfrb.table[rule_index] = None
+        while True:
+            try:
+                self.apfrb.rules.remove(None)
+                self.apfrb.table.remove(None)
+            except Exception: # Exception is raised when there is no more NoneType objects to remove
+                self.apfrb.r = len(self.apfrb.rules) # update the stored count of number of rules
+                break
+    
+    def step_2(self, Z, MULTIPROCESSING=False, PROCESSES=2, skip=False):
+        """
+        For each rule k, compute m_k and l_k,
         if m_k * l_k is small, then delete rule k from APFRB
         (WARNING: this results in a Fuzzy Logic Controller)
 
+        Parameters
+        ----------
+        Z : Numpy 2-D array.
+            Raw data observations.
+        MULTIPROCESSING : bool, optional
+            Enables multiprocessing. The default is False.
+        PROCESSES : int, optional
+            Determines the number of processes for multiprocessing. The default is 2.
+        skip : bool, optional
+            Controls whether to enable this step in the simplification process. The default is False.
+
+        Returns
+        -------
+        None.
+
+        """
+        if not skip:
+            print('\nStep 2 in progress (this might take awhile)...')
+            m_k_l_ks = []
+    
+            if MULTIPROCESSING:
+                with Pool(PROCESSES) as p:
+                    rule_activations = partial(self.__determine_rule_activations, data=Z)
+                    rules_list = np.array_split(self.apfrb.rules, PROCESSES)
+                    m_k_l_ks = p.map(rule_activations, rules_list)
+                    m_k_l_ks = list(itertools.chain(*m_k_l_ks))
+            else:
+                m_k_l_ks = self.__determine_rule_activations(self.apfrb.rules, data=Z)
+    
+            # x coordinate is the number of rules, y coordinate is m_k * l_k
+            q = len(m_k_l_ks)
+            xs = range(q)
+            ys = sorted(m_k_l_ks)
+            line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k')
+    
+        print('\nThe five smallest m_k * l_k values: \n\n%s' % sorted(m_k_l_ks)[:5])
+
+        m = np.diff(ys) / np.diff(xs)
+        
+        idx = np.nonzero(np.round(np.diff(m), 1))[0][0] + 1
+        epsilon = ys[idx]
+        indices_of_rules_to_delete = np.where(np.array(m_k_l_ks) <= epsilon)[0]
+        print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indices_of_rules_to_delete))
+        self.__delete_rules_by_indices(indices_of_rules_to_delete)
+    
+    def simplify(self, Z, MULTIPROCESSING=False, PROCESSES=2):
+        """ 
         step 3, if e/r is small, then output f_k(x) instead of f(x)
 
         step 4, if a specific atom (e.g. "x_1 is smaller than 7")
@@ -69,117 +220,12 @@ class RuleReducer:
         start_time = time.time()
 
         # step 1
-        yes = True
-        print('\nWould you like to remove an antecedent from the IF part? [y/n]')
-        yes = input().lower() == 'y'
-        while(yes):
-            print('\nStep 1 in progress (this should be quick)...')
-            sorted_a = sorted([abs(x) for x in self.apfrb.a[1:]]) # ignore the output node bias, find absolute values, and sort
-            bar(range(len(sorted_a)), sorted_a, 'The values of a_k', 'The size of vector a (except a_0)', 'The value of a_i (where 0 < i <= m)')
-
-            try:
-                print('\nHow many of the smallest values would you like to retrieve? [type \'cancel\' to skip Step 1]')
-                raw = input()
-                ans = int(raw)
-                print('\n%s' % sorted_a[:ans])
-            except Exception:
-                if raw.lower() == 'cancel':
-                    print('\nSkipping step 1.')
-                    break
-                else:
-                    print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
-                    continue
-
-            try:
-                print('\nUp to and including which value\'s index would you like to remove until? [type \'cancel\' to skip Step 1]')
-                raw = input()
-                ans = int(raw)
-                small_val = sorted_a[ans]
-                temp = np.array([abs(x) for x in self.a[1:]])
-                small_val_indices = np.where(temp <= small_val)[0]
-                print('\nDeleting up to, and including, a_i = %s...' % small_val)
-            except Exception:
-                if raw.lower() == 'cancel':
-                    print('\nSkipping step 1.')
-                    break
-                else:
-                    print('\nInvalid response. Unsure of how to respond. Resetting step 1.')
-                    continue
-
-            num_of_rules_to_delete = len(self.rules) - (len(self.rules) / (2 * len(small_val_indices)))
-            print('\nConfirm the deletion of %s fuzzy logic rules (out of %s rules). [y/n]' % (num_of_rules_to_delete, len(self.rules)))
-            delete = input().lower() == 'y'
-
-            if delete:
-                while small_val_indices.any():
-                    index = small_val_indices[0]
-                    self.__delete(index)
-                    temp = np.array([abs(x) for x in self.a[1:]])
-                    small_val_indices = np.where(temp <= small_val)[0]
-
-            print('\nThe All Permutations Rule Base now has %s rules.' % len(self.rules))
-            print('\nWould you like to remove another antecedent from the IF part? [y/n]')
-            yes = input().lower() == 'y'
+        self.step_1()
 
         # step 2
-        # converts the APFRB to a FLC
-        print('\nStep 2 in progress (this might take awhile)...')
-        m_k_l_ks = []
-        q = len(self.apfrb.rules)
-
-        if MULTIPROCESSING:
-            if __name__ == '__main__':
-                with Pool(4) as p:
-                    step_2 = partial(self.step_2, data=Z)
-                    rules_list = [self.apfrb.rules[:int(q/4)], 
-                                  self.apfrb.rules[int(q/4):int(q/2)], 
-                                  self.apfrb.rules[int(q/2):3*(int(q/4))], 
-                                  self.apfrb.rules[3*int(q/2):]]
-                    m_k_l_ks = p.map(step_2, rules_list)
-                    print(m_k_l_ks)
-        else:
-            for k in range(q):
-                if k == q / 4:
-                    current_time = time.time()
-                    print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
-                elif k == q / 2:
-                    current_time = time.time()
-                    print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
-                elif k == 3 * q / 4:
-                    current_time = time.time()
-                    print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
-
-                t_ks = []
-                c_ks = []
-                rule_k = self.apfrb.rules[k]
-                for z in Z:
-                    t_ks.append(rule_k.t(z))
-                    c_ks.append(self.apfrb.c_k(z, k))
-                m_k = max(t_ks)
-                l_k = max(c_ks)
-                m_k_l_ks.append(m_k * l_k)
-
-            # x coordinate is the number of rules, y coordinate is m_k * l_k
-            line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k')
-
+        m_k_l_ks = self.step_2(Z, MULTIPROCESSING, PROCESSES)
+        
         return m_k_l_ks
-        print('\nThe five smallest m_k * l_k values: \n\n%s' % sorted(m_k_l_ks)[:5])
-
-        epsilon = 0.3 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
-        array = np.array(m_k_l_ks)
-        indices_to_rules_to_delete = np.where(array < epsilon)[0]
-        print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indices_to_rules_to_delete))
-        # iterate through the rule base, swapping out rules with NoneType to delete later
-        for rule_index in indices_to_rules_to_delete:
-            self.rules[rule_index] = None
-            self.table[rule_index] = None
-        while True:
-            try:
-                self.rules.remove(None)
-                self.table.remove(None)
-            except Exception:
-                self.r = len(self.rules) # update the stored count of number of rules
-                break
 
         # step 3
         # determines whether Mean of Maximum defuzzification can be used, if e / r is small enough
