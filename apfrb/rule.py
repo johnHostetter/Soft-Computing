@@ -13,13 +13,19 @@ class LogisticTerm:
     def __init__(self, k, neg_or_pos):
         self.k = k
         self.type = neg_or_pos
+        self.memo = {}
     def __str__(self):
         if self.type == "+":
             return ("larger than %s" % self.k)  
         else:
             return ("smaller than %s" % self.k)
     def mu(self, x):
-        return self.logistic(x, self.k, self.type)
+        key = hash(tuple(map(float, x)))
+        if key in self.memo:
+            return self.memo[key]
+        else:
+            self.memo[key] = self.logistic(x, self.k, self.type)
+            return self.memo[key]
     def logistic(self, y, k, t='-'):
         """
         The logistic membership function.

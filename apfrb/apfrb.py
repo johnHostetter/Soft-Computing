@@ -9,33 +9,17 @@ Created on Wed Feb 17 00:49:48 2021
 import time
 import itertools
 import numpy as np
-from rule import Rule, ElseRule
-from common import bar, line
+import sympy as sp
 from copy import deepcopy
 from sklearn import datasets
+from functools import partial
+#from multiprocessing import Pool
+from pathos.multiprocessing import ProcessingPool as Pool
 
-import sympy as sp
+from rule import Rule, ElseRule
+from common import bar, line
 
-np.random.seed(10)     
-
-# class FLC:
-#     def __init__(self, apfrb):
-#         """
-#         Create a Type-1 Singleton Fuzzy Logic Controller (FLC).
-
-#         Parameters
-#         ----------
-#         apfrb : APFRB
-#             All Permutations Fuzzy Rule Base.
-
-#         Returns
-#         -------
-#         None.
-
-#         """
-#         self.rules = self.convert_rules(apfrb.rules)
-#     def convert_rules(self, rules):
-#         pass
+np.random.seed(10)
 
 class ANN:
     def __init__(self, W, b, c, beta):
@@ -127,7 +111,6 @@ class APFRB:
         self.v = list(v) # a vector of size m describing the biases for the ANN's hidden layer
         self.a = a # a vector of size m + 1 (since it includes a_0 - the output node's bias)
         self.__reset() # reset/initialize all the variables that are dependent upon 'W', 'v' or 'a'
-        self.d_memo = {}
         
     def __str__(self):
         """
@@ -198,6 +181,7 @@ class APFRB:
         self.lookup = {}
         self.logistic_terms = ['smaller than', 'larger than']
         self.rules = []
+        self.d_memo = {}
         if self.n > self.m:
             size = self.n
         else:
@@ -292,9 +276,9 @@ class APFRB:
 
         """
         key = hash(tuple(map(float, x)))
-        try:
+        if key in self.d_memo:
             return self.d_memo[key]
-        except KeyError:
+        else:
             d = 0.0
             q = self.r
             for i in range(q):
@@ -366,6 +350,7 @@ class APFRB:
             y = np.dot(self.W[j].T, z)
             x.append(y)
             t = np.tanh(x[j] - self.v[j]) # ann formula
+            return t
             if True: # disable if not interested in checking FLC consistency
                 # check FLC inference is still consistent with ann formula
                 k = self.v[j]
@@ -463,7 +448,34 @@ class APFRB:
     def T_flc(self):
         pass
     
-    def simplify(self, D):
+    def step_2(self, rules, data):
+        print('\nStep 2 in progress (this might take awhile)...')
+        start_time = time.time()
+        m_k_l_ks = []
+        q = len(rules)
+        for k in range(q):
+            if k == q / 4:
+                current_time = time.time()
+                print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+            elif k == q / 2:
+                current_time = time.time()
+                print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
+            elif k == 3 * q / 4:
+                current_time = time.time()
+                print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+            
+            t_ks = []
+            c_ks = []
+            rule_k = rules[k]
+            for z in data:
+                t_ks.append(rule_k.t(z))
+                c_ks.append(self.__c_k(z, k))
+            m_k = max(t_ks)
+            l_k = max(c_ks)
+            m_k_l_ks.append(m_k * l_k)
+        return m_k_l_ks
+    
+    def simplify(self, D, MULTIPROCESSING):
         """ step 1, for each k, if the abs(a_k) is small, 
         remove the atoms containing x_k in the IF part,
         and remove a_k from the THEN part of all the rules 
@@ -540,28 +552,42 @@ class APFRB:
         print('\nStep 2 in progress (this might take awhile)...')
         m_k_l_ks = []
         q = len(self.rules)
-        for k in range(q):
-            if k == q / 4:
-                current_time = time.time()
-                print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
-            elif k == q / 2:
-                current_time = time.time()
-                print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
-            elif k == 3 * q / 4:
-                current_time = time.time()
-                print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
-            
-            t_ks = []
-            c_ks = []
-            rule_k = self.rules[k]
-            for z in D:
-                t_ks.append(rule_k.t(z))
-                c_ks.append(self.__c_k(z, k))
-            m_k = max(t_ks)
-            l_k = max(c_ks)
-            m_k_l_ks.append(m_k * l_k)
-        line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k') # x coordinate is the number of rules, y coordinate is m_k * l_k
+
+        if MULTIPROCESSING:
+            if __name__ == '__main__':
+                with Pool(4) as p:
+                    step_2 = partial(apfrb.step_2, data=D)
+                    rules_list = [apfrb.rules[:int(q/4)], apfrb.rules[int(q/4):int(q/2)], 
+                                                       apfrb.rules[int(q/2):3*(int(q/4))], 
+                                                       apfrb.rules[3*int(q/2):]]
+                    m_k_l_ks = p.map(step_2, rules_list)
+                    print(m_k_l_ks)
+        else:
+            for k in range(q):
+                if k == q / 4:
+                    current_time = time.time()
+                    print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+                elif k == q / 2:
+                    current_time = time.time()
+                    print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
+                elif k == 3 * q / 4:
+                    current_time = time.time()
+                    print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+                
+                t_ks = []
+                c_ks = []
+                rule_k = self.rules[k]
+                for z in D:
+                    t_ks.append(rule_k.t(z))
+                    c_ks.append(self.__c_k(z, k))
+                m_k = max(t_ks)
+                l_k = max(c_ks)
+                m_k_l_ks.append(m_k * l_k)
+                
+            # x coordinate is the number of rules, y coordinate is m_k * l_k
+            line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k')
         
+        return m_k_l_ks
         print('\nThe five smallest m_k * l_k values: \n\n%s' % sorted(m_k_l_ks)[:5])
         
         epsilon = 0.3 # TODO: find some way to automate this by plotting the sorted m_k * l_k's
@@ -740,8 +766,8 @@ class APFRB:
         parsed_expressions = []
         reduced_expressions = []
         for equation in equations:
-            parsed_expressions.append(sp.parse_expr(equation))
-            # parsed_expressions.append(sp.sympify(equation)) # this also works
+#            parsed_expressions.append(sp.parse_expr(equation)) # this also works
+            parsed_expressions.append(sp.sympify(equation))
             
             # get the coefficients from the equation, ignore the last coefficient in the list returned,
             # it is the constant that is not being multiplied by any normalized z_i
@@ -758,7 +784,7 @@ class APFRB:
             # reduced_expressions.append(reduced_expression)
             
             # obtain remainder of expression
-            removed_part_of_expression = sp.parse_expr(equation)
+            removed_part_of_expression = sp.sympify(equation)
             arg = 'z[%s]' % (z_idx - 1)
             # substitute the non-important weights/terms with zero
             removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
@@ -829,7 +855,7 @@ def main():
     b = np.array([-7, -520, -11])
     c = np.array([-0.5, 0.5, -1])
     n_inputs = 4 # number of inputs, has no impact on program executability
-    n_neurons = 8 # number of neurons in the hidden layer, maximum number of neurons this can handle is 21
+    n_neurons = 10 # number of neurons in the hidden layer, maximum number of neurons this can handle is 21
     W = np.random.random(size=(n_neurons, n_inputs))
     b = np.random.random(size=(n_neurons,))
     c = np.random.random(size=(n_neurons,))
@@ -846,26 +872,6 @@ def iris_classification(f):
         return 0 # virginica
     elif 0.5 < f:
         return 1 # setosa
-
-ann, l, r = main()
-apfrb = ann.T()
-print(apfrb.r)
-
-# import some data to play with
-iris = datasets.load_iris()
-Z = iris.data[:, :4]  # we only take the first four features.
-Z = np.flip(Z, axis = 1)
-y = iris.target - 1 # target values that match APFRB paper
-
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(Z, y, test_size = 0.20)
-
-from sklearn.preprocessing import StandardScaler
-scaler = StandardScaler()
-scaler.fit(X_train)
-
-X_train = scaler.transform(X_train)
-X_test = scaler.transform(X_test)
     
 def test(apfrb):     
     from snklearn.neural_network import MLPClassifier
@@ -888,15 +894,68 @@ def avg_error(apfrb, ann, D):
 def read(equations):
     for equation in equations:
         print(sp.sympify(equation))
-
-start = time.time()
-apfrb.simplify(Z)
-end = time.time()
-print(end-start)
-
-# flc_rules, zs, equations, reduced_expressions = apfrb.simplify(Z)
-# print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
-# test(apfrb)
-
-# for i in range(len(flc_rules)):
-#     print(flc_rules[i])
+        
+def foo(x):
+    return x*x
+        
+if __name__ == '__main__':
+    ann, l, r = main()
+    apfrb = ann.T()
+    print(apfrb.r)
+    
+    # import some data to play with
+    iris = datasets.load_iris()
+    Z = iris.data[:, :4]  # we only take the first four features.
+    Z = np.flip(Z, axis = 1)
+    y = iris.target - 1 # target values that match APFRB paper
+    
+    from sklearn.model_selection import train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(Z, y, test_size = 0.20)
+    
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+    
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+            
+    #start = time.time()
+    #results_0 = apfrb.step_2(Z, apfrb.rules[:int(apfrb.r/2)])
+    #results_1 = apfrb.step_2(Z, apfrb.rules[int(apfrb.r/2):])
+    #end = time.time()
+    #print(end - start)
+    
+#    import os
+#    import threading
+#    from multiprocessing import Pool
+#    
+#    start = time.time()
+#    #t1 = threading.Thread(target=apfrb.step_2, args=(Z, apfrb.rules[:int(apfrb.r/2)]))
+#    #t2 = threading.Thread(target=apfrb.step_2, args=(Z, apfrb.rules[int(apfrb.r/2):]))
+#    #
+#    #t1.start()
+#    #t2.start()
+#    #t1.join()
+#    #t2.join()
+#    apfrb.D = Z
+#    with Pool(4) as p:
+##        print(p.map(foo, [1,2,3]))
+#        print(p.map(apfrb.step_2, [apfrb.rules[:int(apfrb.r/4)], apfrb.rules[int(apfrb.r/4):int(apfrb.r/2)], 
+#                                               apfrb.rules[int(apfrb.r/2):3*(int(apfrb.r/4))], apfrb.rules[3*int(apfrb.r/2):]]))
+#    
+#    #results_0 = apfrb.step_2(Z, apfrb.rules[:int(apfrb.r/2)])
+#    #results_1 = apfrb.step_2(Z, apfrb.rules[int(apfrb.r/2):])
+#    end = time.time()
+#    print(end - start)
+    
+    start = time.time()
+    apfrb.simplify(Z, True)
+    end = time.time()
+    print(end-start)
+    
+    # flc_rules, zs, equations, reduced_expressions = apfrb.simplify(Z)
+    # print('\naverage error +/- %s' % avg_error(apfrb, ann, X_train))
+    # test(apfrb)
+    
+    # for i in range(len(flc_rules)):
+    #     print(flc_rules[i])
