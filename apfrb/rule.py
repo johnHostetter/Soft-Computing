@@ -7,49 +7,25 @@ Created on Sun Feb 21 21:51:30 2021
 """
 
 import numpy as np
-from common import subs
+
+try:
+    from .common import subs, logistic
+except ImportError:
+    from common import subs, logistic
 
 class LogisticTerm:
     def __init__(self, k, neg_or_pos):
         self.k = k
         self.type = neg_or_pos
+        self.__logistic = logistic
         self.memo = {}
     def __str__(self):
         if self.type == "+":
-            return ("larger than %s" % self.k)  
+            return ("larger than %s" % self.k)
         else:
             return ("smaller than %s" % self.k)
     def mu(self, x):
-        key = hash(tuple(map(float, x)))
-        if key in self.memo:
-            return self.memo[key]
-        else:
-            self.memo[key] = self.logistic(x, self.k, self.type)
-            return self.memo[key]
-    def logistic(self, y, k, t='-'):
-        """
-        The logistic membership function.
-
-        Parameters
-        ----------
-        y : float
-            The input.
-        k : float
-            The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
-        t : string, optional
-            Adjusts whether this logistic membership function is describing term- or term+. 
-            The default is '-'.
-
-        Returns
-        -------
-        float
-            The degree of membership.
-
-        """
-        val = 2.0
-        if t == '+':
-            val = -2.0
-        return 1.0 / (1.0 + np.exp(val * (y-k)))
+        return self.__logistic(x, self.k, self.type)
 
 class ElseRule:
     def __init__(self, consequent):
@@ -102,7 +78,7 @@ class Rule:
         self.W = W
         self.v = v
         self.memo = {}
-    
+
     def __str__(self):
         """
         Generates a string representation of the fuzzy logic rule.
@@ -115,7 +91,7 @@ class Rule:
         """
         indices = list(self.antecedents.keys())
         values = list(self.antecedents.values())
-        
+
         a = list(self.consequents.values())
         signs = list(map(subs, values)) # a vector describing the +/- signs for the a's in the IF-THEN consequents
         consequent = a[0] + np.dot(signs, a[1:]) # TODO: consider storing the consequent in the rule
@@ -131,7 +107,7 @@ class Rule:
                 output += 'AND '
         output += 'THEN f = %.2f' % (consequent) # the consequent for the IF-THEN rule
         return output
-    
+
     def normalize_keys(self):
         """
         Resets the keys in the rule to begin count from '1'.
@@ -145,13 +121,13 @@ class Rule:
         a = list(self.consequents.values())
         self.antecedents = {(key + 1): value for key, value in enumerate(rule)}
         self.consequents = {key: value for key, value in enumerate(a)}
-    
+
     def consequent(self):
         values = list(self.antecedents.values())
         a = list(self.consequents.values())
         signs = list(map(subs, values)) # a vector describing the +/- signs for the a's in the IF-THEN consequents
         return a[0] + np.dot(signs, a[1:])
-    
+
     def t(self, z):
         """
         Calculates the degree of firing for this rule.
@@ -180,12 +156,12 @@ class Rule:
                 y = np.dot(self.W[index - 1].T, z)
                 k = self.v[index - 1]
                 if entry:
-                    degree *= self.logistic(y, k, '+')
+                    degree *= self.rule_mu(y, k, '+')
                 else:
-                    degree *= self.logistic(y, k)
+                    degree *= self.rule_mu(y, k)
             self.memo[key] = degree
             return degree
-    
+
     def convert_to_flc_type(self):
         antecedents = {}
         indices = list(self.antecedents.keys())
@@ -199,28 +175,7 @@ class Rule:
             else:
                 antecedents[index] = LogisticTerm(k, '-')
         return FLC_Rule(antecedents, self.consequent())
-                
-    def logistic(self, y, k, t='-'):
-        """
-        The logistic membership function.
 
-        Parameters
-        ----------
-        y : float
-            The input.
-        k : float
-            The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
-        t : string, optional
-            Adjusts whether this logistic membership function is describing term- or term+. 
-            The default is '-'.
-
-        Returns
-        -------
-        float
-            The degree of membership.
-
-        """
-        val = 2.0
-        if t == '+':
-            val = -2.0
-        return 1.0 / (1.0 + np.exp(val * (y-k)))
+    def rule_mu(self, y, k, t='-'):
+        # TODO: generalize this so that any linguistic term's membership function works
+        return logistic(y, k, t)

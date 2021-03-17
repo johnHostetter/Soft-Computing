@@ -6,7 +6,33 @@ Created on Sun Feb 21 21:50:21 2021
 @author: john
 """
 
+import numpy as np
 import matplotlib.pyplot as plt
+
+def logistic(x, k, t='-'):
+    """
+    The logistic membership function.
+
+    Parameters
+    ----------
+    x : float
+        The input.
+    k : float
+        The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
+    t : string, optional
+        Adjusts whether this logistic membership function is describing term- or term+.
+        The default is '-'.
+
+    Returns
+    -------
+    float
+        The degree of membership.
+
+    """
+    val = 2.0
+    if t == '+':
+        val = -2.0
+    return 1.0 / (1.0 + np.exp(val * (x - k)))
 
 def subs(x):
     """
@@ -29,11 +55,8 @@ def subs(x):
         the correct sign when calculating a rule's consequent.
 
     """
-    if x:
-        return 1.0
-    else:
-        return -1.0
-    
+    return 1.0 if x else -1.0
+
 def plot(title, x_lbl, y_lbl):
     """
     Handles the basic mechanics of plotting a graph
@@ -57,11 +80,11 @@ def plot(title, x_lbl, y_lbl):
     plt.title(title)
     plt.xlabel(x_lbl)
     plt.ylabel(y_lbl)
-    plt.show()       
-    
+    plt.show()
+
 def line(x, y, title, x_lbl, y_lbl):
     """
-    
+
 
     Parameters
     ----------
@@ -83,10 +106,10 @@ def line(x, y, title, x_lbl, y_lbl):
     """
     plt.plot(x, y)
     plot(title, x_lbl, y_lbl)
-    
+
 def bar(x, heights, title, x_lbl, y_lbl):
     """
-    
+
 
     Parameters
     ----------
