@@ -8,6 +8,64 @@ Created on Wed Mar 17 16:48:59 2021
 
 import numpy as np
 
+def random_ann(n_inputs=3, n_neurons=6):
+    """
+    Prepares a random ANN that has been trained to recognize some arbitrary function.
+    
+    CAUTION: n_neurons cannot exceed the value of 21, whereas n_inputs does not impact
+    program executability.
+
+    Parameters
+    ----------
+    n_inputs : TYPE, optional
+        DESCRIPTION. The default is 3.
+    n_neurons : TYPE, optional
+        DESCRIPTION. The default is 6.
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    """
+    W = np.random.random(size=(n_neurons, n_inputs))
+    b = np.random.random(size=(n_neurons,))
+    c = np.random.random(size=(n_neurons,))
+    if len(b) != len(c):
+        raise Exception('The vector \'b\' must equal the vector \'c\'.')
+    return ANN(W, b, c, 0.0)
+
+def iris_ann():
+    """
+    Prepares the ANN that has been trained to recognize the Iris dataset.
+
+    Raises
+    ------
+    Exception
+        An exception is thrown when the vector 'b' is not equal to the vector 'c'.
+
+    Returns
+    -------
+    ANN
+        The ANN of interest.
+    l : int
+        The number of antecedents in the fuzzy logic rules.
+    r : int
+        The number of fuzzy logic rules for all permutations.
+
+    """
+    W = np.array([[-0.4, -5, -0.3, 0.7], [150, 150, -67, -44], [-5, 9, -7, 2]])
+    b = np.array([-7, -520, -11])
+    c = np.array([-0.5, 0.5, -1])
+    if len(b) != len(c):
+        raise Exception('The vector \'b\' must equal the vector \'c\'.')
+    return ANN(W, b, c, 0.0)
+
 class ANN:
     def __init__(self, W, b, c, beta):
         """
