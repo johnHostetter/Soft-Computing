@@ -65,7 +65,7 @@ if __name__ == '__main__':
     
     start = time.time()
     ruleReducer = RuleReducer(apfrb)
-    flc = ruleReducer.to_flc(Z, False)
+    flc = ruleReducer.to_flc(Z, True)
     # rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
     z = Z[0]
     y = []

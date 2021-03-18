@@ -9,6 +9,7 @@ Created on Wed Mar 17 16:54:08 2021
 import time
 import itertools
 import numpy as np
+import pandas as pd
 from copy import deepcopy
 from functools import partial
 from multiprocessing import Pool
@@ -101,8 +102,24 @@ class RuleReducer:
         else:
             print('\nSkipping step 1...')
                 
-    def __determine_rule_activations(self, rules, data):
+    def entries_to_csv(self, entries, i, j):
+        df = pd.DataFrame(entries)
+        file_name = './data/rules_{}_to_{}.csv'.format(i, j)
+        df.to_csv(file_name, index=False)
+        return {'rule':[], 'z':[], 't_k_z':[], 'c_k_z':[], 'max(m_k)*max(c_k)':[]} 
+    
+    def determine_rule_activations(self, rules, data):
         print('\nDetermine rule activations')
+        if isinstance(rules, dict):
+            rule_labels = list(rules.keys())
+            rules = list(rules.values())
+            multiprocessing = True # rules object is dictionary only when using multiprocessing
+        else:
+            rule_labels = [*range(len(rules))]
+            multiprocessing = False
+        
+        entries = {'rule':[], 'z':[], 't_k_z':[], 'c_k_z':[], 'max(m_k)*max(c_k)':[]}    
+        
         start_time = time.time()
         m_k_l_ks = []
         q = len(rules)
@@ -110,22 +127,39 @@ class RuleReducer:
             if k == q / 4:
                 current_time = time.time()
                 print('\nA quarter of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
+                if multiprocessing:
+                    entries = self.entries_to_csv(entries, rule_labels[0], rule_labels[k-1])
             elif k == q / 2:
                 current_time = time.time()
                 print('\nHalfway done [elapsed time: %s seconds]...' % (current_time - start_time))
+                if multiprocessing:
+                    entries = self.entries_to_csv(entries, rule_labels[int(q/4)], rule_labels[k-1])
             elif k == 3 * q / 4:
                 current_time = time.time()
                 print('\nThree quarters of the way done [elapsed time: %s seconds]...' % (current_time - start_time))
-
+                if multiprocessing:
+                    entries = self.entries_to_csv(entries, rule_labels[int(q/2)], rule_labels[k-1])
             t_ks = []
             c_ks = []
             rule_k = rules[k]
+            z_i = 0
             for z in data:
                 t_ks.append(rule_k.t(z))
                 c_ks.append(self.apfrb.c_k(z, k))
+                entries['rule'].append(rule_labels[k])
+                entries['z'].append(z_i)
+                entries['t_k_z'].append(t_ks[-1])
+                entries['c_k_z'].append(c_ks[-1])
+                z_i += 1
+            
             m_k = max(t_ks)
             l_k = max(c_ks)
             m_k_l_ks.append(m_k * l_k)
+            entries['max(m_k)*max(c_k)'].extend([m_k_l_ks[-1]] * (z_i))
+        if multiprocessing:
+            _ = self.entries_to_csv(entries, rule_labels[3 * int(q/4)], rule_labels[q - 1])
+        else:
+            _ = self.entries_to_csv(entries, 0, (len(rules)-1))
         return m_k_l_ks
     
     def __delete_rules_by_indices(self, indices):
@@ -169,12 +203,17 @@ class RuleReducer:
     
             if MULTIPROCESSING:
                 with Pool(PROCESSES) as p:
-                    rule_activations = partial(self.__determine_rule_activations, data=Z)
+                    rule_activations = partial(self.determine_rule_activations, data=Z)
                     rules_list = np.array_split(self.apfrb.rules, PROCESSES)
-                    m_k_l_ks = p.map(rule_activations, rules_list)
+                    ite = 1
+                    rules_dict_list = []
+                    for rule_list in rules_list:
+                        rules_dict_list.append(dict(zip(range(ite, ite + len(rule_list)), rule_list)))
+                        ite += (len(rule_list))
+                    m_k_l_ks = p.map(rule_activations, rules_dict_list)
                     m_k_l_ks = list(itertools.chain(*m_k_l_ks))
             else:
-                m_k_l_ks = self.__determine_rule_activations(self.apfrb.rules, data=Z)
+                m_k_l_ks = self.determine_rule_activations(self.apfrb.rules, data=Z)
     
             # x coordinate is the number of rules, y coordinate is m_k * l_k
             q = len(m_k_l_ks)
