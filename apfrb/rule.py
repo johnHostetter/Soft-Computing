@@ -38,6 +38,7 @@ class FLC_Rule:
         self.antecedents = antecedents
         self.consequent = consequent
         self.else_clause = False # by default is False, but may become True when rule ordering matters
+        self.memo = {}
     def __str__(self):
         output = 'IF'
         iterations = 0
@@ -55,6 +56,7 @@ class FLC_Rule:
             output += ' ELSE '
         return output
     def t(self, x):
+        
         """
         Calculates the degree of firing for this rule.
 
@@ -68,7 +70,15 @@ class FLC_Rule:
         None.
 
         """
-        pass
+        key = hash(tuple(map(float, list(x.values()))))
+        if key in self.memo:
+            return self.memo[key]
+        else:
+            degree = 1.0
+            for key in self.antecedents.keys():
+                degree *= self.antecedents[key].mu(x[key])
+            self.memo[key] = degree
+            return degree
 
 class APFRB_Rule:
     def __init__(self, antecedents, consequents, lookup, W, v):
