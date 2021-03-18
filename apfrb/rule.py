@@ -70,7 +70,7 @@ class FLC_Rule:
         """
         pass
 
-class Rule:
+class APFRB_Rule:
     def __init__(self, antecedents, consequents, lookup, W, v):
         self.antecedents = antecedents # dictionary
         self.consequents = consequents # dictionary
@@ -161,20 +161,6 @@ class Rule:
                     degree *= self.rule_mu(y, k)
             self.memo[key] = degree
             return degree
-
-    def convert_to_flc_type(self):
-        antecedents = {}
-        indices = list(self.antecedents.keys())
-        values = list(self.antecedents.values())
-        for loop_idx in range(len(values)):
-            index = indices[loop_idx]
-            entry = values[loop_idx]
-            k = self.v[index - 1]
-            if entry:
-                antecedents[index] = LogisticTerm(k, '+')
-            else:
-                antecedents[index] = LogisticTerm(k, '-')
-        return FLC_Rule(antecedents, self.consequent())
 
     def rule_mu(self, y, k, t='-'):
         # TODO: generalize this so that any linguistic term's membership function works

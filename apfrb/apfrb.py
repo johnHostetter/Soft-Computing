@@ -11,9 +11,9 @@ import numpy as np
 from copy import deepcopy
 
 try:
-    from .rule import Rule
+    from .rule import APFRB_Rule
 except ImportError:
-    from rule import Rule
+    from rule import APFRB_Rule
 
 class APFRB:
     def __init__(self, W, v, a):
@@ -106,7 +106,7 @@ class APFRB:
             rule = self.table[i] # only contains the antecedents' term assignments
             antecedents = {(key + 1): value for key, value in enumerate(rule)} # indexed by x_i
             consequents = {key: value for key, value in enumerate(self.a)} # indexed by a_i, including a_0
-            self.rules.append(Rule(antecedents, consequents, self.lookup, self.W, self.v))
+            self.rules.append(APFRB_Rule(antecedents, consequents, self.lookup, self.W, self.v))
 
     def __delete(self, i):
         """

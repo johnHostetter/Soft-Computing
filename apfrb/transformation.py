@@ -11,11 +11,13 @@ import numpy as np
 try:
     from .ann import ANN
     from .apfrb import APFRB
+    from rule import LogisticTerm, FLC_Rule
 except ImportError:
     from ann import ANN
     from apfrb import APFRB
+    from rule import LogisticTerm, FLC_Rule
     
-def T(self):
+def T(ann):
     """
     Defines the transformation between ANN to APFRB.
 
@@ -25,13 +27,13 @@ def T(self):
         This ANN's equivalent APFRB.
 
     """
-    a_0 = self.beta # assuming activation function is tanh
+    a_0 = ann.beta # assuming activation function is tanh
     a = [a_0]
-    a.extend(self.c)
-    v = -1.0 * self.b
-    return APFRB(self.W, v, a)
+    a.extend(ann.c)
+    v = -1.0 * ann.b
+    return APFRB(ann.W, v, a)
 
-def T_inv(self):
+def T_inv(apfrb):
 
     """
     Defines the inverse transformation between APFRB to ANN.
@@ -42,10 +44,27 @@ def T_inv(self):
         This APFRB's equivalent ANN.
 
     """
-    beta = self.a[0] # fetching the output node's bias
+    beta = apfrb.a[0] # fetching the output node's bias
     try:
-        b = -1.0 * self.v # returning the biases to their original value
+        b = -1.0 * apfrb.v # returning the biases to their original value
     except TypeError: # self.v is saved as a sequence instead of a numpy array
-        b = -1.0 * np.array(self.v)
-    c = self.a[1:] # fetching the weights between the hidden layer and the output node
-    return ANN(self.W, b, c, beta)
+        b = -1.0 * np.array(apfrb.v)
+    c = apfrb.a[1:] # fetching the weights between the hidden layer and the output node
+    return ANN(apfrb.W, b, c, beta)
+
+def APFRB_rule_to_FLC_rule(apfrb_rule):
+    antecedents = {}
+    indices = list(apfrb_rule.antecedents.keys())
+    values = list(apfrb_rule.antecedents.values())
+    for loop_idx in range(len(values)):
+        index = indices[loop_idx]
+        entry = values[loop_idx]
+        k = apfrb_rule.v[index - 1]
+        if entry:
+            antecedents[index] = LogisticTerm(k, '+')
+        else:
+            antecedents[index] = LogisticTerm(k, '-')
+    return FLC_Rule(antecedents, apfrb_rule.consequent())
+
+def APFRB_to_FLC(apfrb):
+    pass

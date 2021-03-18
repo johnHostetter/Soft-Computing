@@ -14,35 +14,20 @@ from functools import partial
 from multiprocessing import Pool
 
 try:
-    from .common import bar, line
+    from .flc import FLC
     from .rule import ElseRule
+    from .common import bar, line
+    from .transformation import APFRB_rule_to_FLC_rule
 except ImportError:
-    from common import bar, line
+    from flc import FLC
     from rule import ElseRule
-    
-# def chunks(lst, n):
-#     """
-#     Yield successive n-sized chunks from lst.
-
-#     Parameters
-#     ----------
-#     lst : list
-#         The list that should be divided into n-sized chunks.
-#     n : int
-#         DESCRIPTION.
-
-#     Yields
-#     ------
-#     TYPE
-#         DESCRIPTION.
-
-#     """
-#     for i in range(0, len(lst), n):
-#         yield lst[i:i + n]
+    from common import bar, line
+    from transformation import APFRB_rule_to_FLC_rule
 
 class RuleReducer:
     def __init__(self, apfrb):
         self.apfrb = apfrb
+        self.flc = None
         
     def step_1(self, skip=True):
         """
@@ -206,28 +191,25 @@ class RuleReducer:
         indices_of_rules_to_delete = np.where(np.array(m_k_l_ks) <= epsilon)[0]
         print('\nThere are %s fuzzy logic rules that will be deleted.' % len(indices_of_rules_to_delete))
         self.__delete_rules_by_indices(indices_of_rules_to_delete)
-    
-    def simplify(self, Z, MULTIPROCESSING=False, PROCESSES=2):
-        """ 
-        step 3, if e/r is small, then output f_k(x) instead of f(x)
-
-        step 4, if a specific atom (e.g. "x_1 is smaller than 7")
-        appears in all the rules, then delete it from all of them
-        """
-
-        # TODO: Exception was thrown after being called twice - replicate and fix it
-
-        start_time = time.time()
-
-        # step 1
-        self.step_1()
-
-        # step 2
-        m_k_l_ks = self.step_2(Z, MULTIPROCESSING, PROCESSES)
         
-        return m_k_l_ks
+    def step_3(self, Z, skip=True):
+        """
+        Determines whether Mean of Maximum defuzzification can be used.
+        To answer this, calculate e/r, and if e/r is small, then output f_k(x) instead of f(x).
+        
+        CAUTION: This step is rarely/never used, as e/r is often not small enough to 
+        use MoM defuzzification. Therefore, it is not sufficiently tested, and might not work.
 
-        # step 3
+        Parameters
+        ----------
+        skip : bool, optional
+            Controls whether to enable this step in the simplification process. The default is True.
+
+        Returns
+        -------
+        None.
+
+        """
         # determines whether Mean of Maximum defuzzification can be used, if e / r is small enough
         if False:
             k = None
@@ -265,15 +247,26 @@ class RuleReducer:
                     vals.append(t_k / denominator)
                 r = 1.0 + min(vals)
                 e_rs.append(e/r)
+                
+    def step_4(self):
+        """
+        If a specific atom (e.g. "x_1 is smaller than 7")
+        appears in all the rules, then delete it from all of them
 
+        Returns
+        -------
+        FLC
+            An ordinary fuzzy logic controller.
+
+        """
         # beyond this point, inference no longer works
         # TODO: fix fuzzy logic inference
         flc_rules = []
-        for rule in self.rules:
-            flc_rules.append(rule.convert_to_flc_type())
+        for apfrb_rule in self.apfrb.rules:
+            flc_rules.append(APFRB_rule_to_FLC_rule(apfrb_rule))
 
         # step 4
-        table = np.matrix(self.table) # TODO: update self.table so it is consistent with the new table
+        table = np.matrix(self.apfrb.table) # TODO: update self.table so it is consistent with the new table
         # for i in range(len(self.table[0])):
         i = 0
         while i < len(table[0]):
@@ -285,167 +278,216 @@ class RuleReducer:
             else:
                 i += 1
 
-        # step 5
-        # table = np.matrix(self.table)
-        for i in range(len(np.squeeze(np.asarray(table))[0])):
-            col = np.squeeze(np.array(table[:,i]))
-            uniqs, indices, counts = np.unique(col, return_index=True, return_counts=True)
-            argmin = np.argmin(counts)
-            argindex = indices[np.argmin(counts)]
-            if min(counts) == 1:
-                least_occurring_term = uniqs[np.argmin(counts)]
-                for flc_rule in flc_rules:
-                    # i + 1 since the count for i begins from zero, but antecedents are indexed
-                    # starting from 1 in rule base. The antecedent type of a FLC rule is stored
-                    # as a string, either "-" or "+", but is stored as a boolean in APFRB rule.
-                    # Thus, flc_rule.antecedents[i + 1].type == "+" converts the string representation
-                    # back to its boolean equivalent, and if least occurring term is True, then the
-                    # term+ linguistic term is the least occurring term.
-                    try:
-                        key = list(flc_rule.antecedents.keys())[i] # assumes the antecedents' keys are kept "in order"
-                        if flc_rule.antecedents[key].type == '+' and least_occurring_term:
-                            continue # do not delete the least occurring term from the rule
-                        else:
-                            del flc_rule.antecedents[key]
-                    except IndexError:
-                        # TODO: this likely needs to be fixed, most likely the identification of
-                        # antecedents in the fuzzy logic rules has some logic error that needs addressed
-                        print('IndexError was thrown.')
-                # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
-                top_flc_rule = flc_rules.pop(argindex)
-                top_flc_rule.else_clause = True
-                flc_rules.insert(0, top_flc_rule)
+        self.flc = FLC(flc_rules, np.where(table, 1, 0))
+        return self.flc
 
-        # step 6, classification only
-        consequent_frequency = {} # find the frequency for each rule's consequent term
-        for flc_rule in flc_rules:
-            try:
-                consequent_frequency[flc_rule.consequent] += 1
-            except KeyError:
-                consequent_frequency[flc_rule.consequent] = 1
-        # return the dictionary key that has the maximum value
-        # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
-        max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
-        # import operator
-        # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
+    
+    def to_flc(self, Z, MULTIPROCESSING=False, PROCESSES=2):
+        """
+        Simplifies the APFRB to a FLC.
 
-        index = 0
-        while True:
-            if index < len(flc_rules):
-                flc_rule = flc_rules[index]
-                if flc_rule.consequent == max_freq_key:
-                    flc_rules.pop(index)
+        Parameters
+        ----------
+        Z : Numpy 2-D array.
+            Raw data observations.
+        MULTIPROCESSING : bool, optional
+            Enables multiprocessing. The default is False.
+        PROCESSES : int, optional
+            Defines how many processes should be made if multiprocessing is enabled. The default is 2.
+
+        Returns
+        -------
+        FLC
+            An ordinary fuzzy logic controller.
+
+        """
+
+        # TODO: Exception was thrown after being called twice - replicate and fix it
+
+        self.step_1()
+        self.step_2(Z, MULTIPROCESSING, PROCESSES)
+        self.step_3(Z)
+        return self.step_4()
+    
+    def to_hflc(self, Z):
+        if self.flc is None:
+            print('This RuleReducer object does not have a saved instance of a FLC. Please run \'to_flc\' first.')
+        else:
+            # step 5
+            # TODO: update this, but the below code expects 'table' to have True/False entries
+            # where the FLC object stores entries in 0's or 1's (technically any integer)
+            # for the time being, will use the APFRB's table since it is technically equivalent,
+            # but this is risky and not very robust
+            
+            table = np.matrix(self.apfrb.table) # TEMPORARY FIX
+            
+            # table = np.matrix(self.table)
+            for i in range(len(np.squeeze(np.asarray(table))[0])):
+                col = np.squeeze(np.array(table[:,i]))
+                uniqs, indices, counts = np.unique(col, return_index=True, return_counts=True)
+                argmin = np.argmin(counts)
+                argindex = indices[np.argmin(counts)]
+                if min(counts) == 1:
+                    least_occurring_term = uniqs[np.argmin(counts)]
+                    for flc_rule in self.flc.rules:
+                        # i + 1 since the count for i begins from zero, but antecedents are indexed
+                        # starting from 1 in rule base. The antecedent type of a FLC rule is stored
+                        # as a string, either "-" or "+", but is stored as a boolean in APFRB rule.
+                        # Thus, flc_rule.antecedents[i + 1].type == "+" converts the string representation
+                        # back to its boolean equivalent, and if least occurring term is True, then the
+                        # term+ linguistic term is the least occurring term.
+                        try:
+                            key = list(flc_rule.antecedents.keys())[i] # assumes the antecedents' keys are kept "in order"
+                            if flc_rule.antecedents[key].type == '+' and least_occurring_term:
+                                continue # do not delete the least occurring term from the rule
+                            else:
+                                del flc_rule.antecedents[key]
+                        except IndexError:
+                            # TODO: this likely needs to be fixed, most likely the identification of
+                            # antecedents in the fuzzy logic rules has some logic error that needs addressed
+                            print('IndexError was thrown.')
+                    # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
+                    top_flc_rule = self.flc.rules.pop(argindex)
+                    top_flc_rule.else_clause = True
+                    self.flc.rules.insert(0, top_flc_rule)
+    
+            # step 6, classification only
+            consequent_frequency = {} # find the frequency for each rule's consequent term
+            for flc_rule in self.flc.rules:
+                try:
+                    consequent_frequency[flc_rule.consequent] += 1
+                except KeyError:
+                    consequent_frequency[flc_rule.consequent] = 1
+            # return the dictionary key that has the maximum value
+            # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
+            max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
+            # import operator
+            # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
+    
+            index = 0
+            while True:
+                if index < len(self.flc.rules):
+                    flc_rule = self.flc.rules[index]
+                    if flc_rule.consequent == max_freq_key:
+                        self.flc.rules.pop(index)
+                    else:
+                        index += 1
                 else:
-                    index += 1
-            else:
-                break
-        flc_rules.append(ElseRule(max_freq_key))
-
-        # step 7
-
-        matrix = np.asmatrix(Z)
-        intervals = []
-        for col_idx in range(len(Z[0])):
-            interval = (np.ndarray.item(min(matrix[:,col_idx])),
-                        np.ndarray.item(max(matrix[:,col_idx])))
-            intervals.append(interval)
-
-        weights = deepcopy(self.W)
-
-        import sympy as sp
-        from sympy.solvers import solve
-        from sympy import Symbol
-
-        # get the number of raw inputs
-        n = self.n
-        argument = 'z_1:%s' % n
-        # generate n number of normalized z's to use for the upcoming equation reduction
-        z = sp.symbols(argument) # z is a list of size n containing all z_i variables
-
-
-        # get the number of antecedents
-        l = self.l
-        equations = []
-        for j in range(l):
-            equation = ''
-            row_of_weights = weights[j]
-            for i in range(n):
-                # z_i = z[i]
-                equation += ('Symbol("z[%s]")' % i)
-                equation += ('*(%s)' % str(row_of_weights[i]))
-                interval = intervals[i]
-                minimum = interval[0]
-                maximum = interval[1]
-                equation += ('*(%s)' % str(maximum - minimum))
-                equation += '+'
-                equation += ('(%s)' % str(minimum))
-                equation += ('*(%s)' % str(row_of_weights[i]))
-                if i + 1 < n:
-                    equation += '+'
-            equations.append(equation)
-
-        parsed_expressions = []
-        reduced_expressions = []
-        for equation in equations:
-#            parsed_expressions.append(sp.parse_expr(equation)) # this also works
-            parsed_expressions.append(sp.sympify(equation))
-
-            # get the coefficients from the equation, ignore the last coefficient in the list returned,
-            # it is the constant that is not being multiplied by any normalized z_i
-            coefficients = sp.Poly(equation).coeffs()
-            # coefficients = sp.Poly(sp.sympify(equation)).coeffs() # this also works
-            coefficients = coefficients[:-1] # ignoring the last coefficient since it is not multiplied by any symbol
-            max_coeff = max(coefficients, key=abs) # get the largest coefficient and keep it
-            z_idx = coefficients.index(max_coeff) + 1 # since the z_i count from 1 to n, we add plus 1
-
-            # # create reduced expression
-            # reduced_expression = ''
-            # reduced_expression += ('%s' % max_coeff)
-            # reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
-            # reduced_expressions.append(reduced_expression)
-
-            # obtain remainder of expression
-            removed_part_of_expression = sp.sympify(equation)
-            arg = 'z[%s]' % (z_idx - 1)
-            # substitute the non-important weights/terms with zero
-            removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
-
-            print(sp.sympify(removed_part_of_expression))
-
-            summation = 0.0
-            for observation in Z:
-                for i in range(len(observation)):
-                    z_i = observation[i]
-                    arg = 'z[%s]' % (i)
+                    break
+            self.flc.rules.append(ElseRule(max_freq_key))
+    
+            # step 7
+    
+            matrix = np.asmatrix(Z)
+            intervals = []
+            for col_idx in range(len(Z[0])):
+                interval = (np.ndarray.item(min(matrix[:,col_idx])),
+                            np.ndarray.item(max(matrix[:,col_idx])))
+                intervals.append(interval)
+            
+            # TODO: TEMPORARY FIX - likely need to edit this code so it no longer has to rely on APFRB's W
+            weights = deepcopy(self.apfrb.W)
+    
+            import sympy as sp
+            from sympy.solvers import solve
+            from sympy import Symbol
+    
+            # get the number of raw inputs
+            # TODO: TEMPORARY FIX - likely need to edit this code so it no longer has to rely on APFRB's n
+            n = self.apfrb.n
+            argument = 'z_1:%s' % n
+            # generate n number of normalized z's to use for the upcoming equation reduction
+            z = sp.symbols(argument) # z is a list of size n containing all z_i variables
+    
+    
+            # get the number of antecedents
+            # TODO: TEMPORARY FIX - likely need to edit this code so it no longer has to rely on APFRB's l
+            l = self.apfrb.l
+            equations = []
+            for j in range(l):
+                equation = ''
+                row_of_weights = weights[j]
+                for i in range(n):
+                    # z_i = z[i]
+                    equation += ('Symbol("z[%s]")' % i)
+                    equation += ('*(%s)' % str(row_of_weights[i]))
                     interval = intervals[i]
                     minimum = interval[0]
                     maximum = interval[1]
-                    norm_z_i = (z_i - minimum) / (maximum - minimum)
-                    removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), norm_z_i)
-                summation += float(removed_part_of_expression)
-            summation /= len(Z)
-
-            # create reduced expression
-            reduced_expression = ''
-            reduced_expression += ('%s' % max_coeff)
-            reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
-            reduced_expression += ('+%s' % summation)
-            reduced_expressions.append(reduced_expression)
-
-            # for i in range(n):
-            #     if i == (z_idx - 1):
-            #         # create reduced expression
-            #         reduced_expression = ''
-            #         reduced_expression += ('%s' % max_coeff)
-            #         reduced_expression += ('*Symbol("z[%s]")' % i)
-            #         reduced_expressions.append(reduced_expression)
-            #     else:
-            #         # obtain remainder of expression
-            #         removed_part_of_expression = deepcopy(sp.parse_expr(equation))
-            #         arg = 'z[%s]' % i
-            #         # substitute the non-important weights/terms with zero
-            #         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
-
-            # print(sp.sympify(removed_part_of_expression))
-
-        return flc_rules, intervals, equations, reduced_expressions
+                    equation += ('*(%s)' % str(maximum - minimum))
+                    equation += '+'
+                    equation += ('(%s)' % str(minimum))
+                    equation += ('*(%s)' % str(row_of_weights[i]))
+                    if i + 1 < n:
+                        equation += '+'
+                equations.append(equation)
+    
+            parsed_expressions = []
+            reduced_expressions = []
+            for equation in equations:
+    #            parsed_expressions.append(sp.parse_expr(equation)) # this also works
+                parsed_expressions.append(sp.sympify(equation))
+    
+                # get the coefficients from the equation, ignore the last coefficient in the list returned,
+                # it is the constant that is not being multiplied by any normalized z_i
+                coefficients = sp.Poly(equation).coeffs()
+                # coefficients = sp.Poly(sp.sympify(equation)).coeffs() # this also works
+                coefficients = coefficients[:-1] # ignoring the last coefficient since it is not multiplied by any symbol
+                max_coeff = max(coefficients, key=abs) # get the largest coefficient and keep it
+                z_idx = coefficients.index(max_coeff) + 1 # since the z_i count from 1 to n, we add plus 1
+    
+                # # create reduced expression
+                # reduced_expression = ''
+                # reduced_expression += ('%s' % max_coeff)
+                # reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+                # reduced_expressions.append(reduced_expression)
+    
+                # obtain remainder of expression
+                removed_part_of_expression = sp.sympify(equation)
+                arg = 'z[%s]' % (z_idx - 1)
+                # substitute the non-important weights/terms with zero
+                removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
+    
+                print(sp.sympify(removed_part_of_expression))
+    
+                summation = 0.0
+                for observation in Z:
+                    for i in range(len(observation)):
+                        z_i = observation[i]
+                        arg = 'z[%s]' % (i)
+                        interval = intervals[i]
+                        minimum = interval[0]
+                        maximum = interval[1]
+                        norm_z_i = (z_i - minimum) / (maximum - minimum)
+                        removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), norm_z_i)
+                    summation += float(removed_part_of_expression)
+                summation /= len(Z)
+    
+                # create reduced expression
+                reduced_expression = ''
+                reduced_expression += ('%s' % max_coeff)
+                reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+                reduced_expression += ('+%s' % summation)
+                reduced_expressions.append(reduced_expression)
+    
+                # for i in range(n):
+                #     if i == (z_idx - 1):
+                #         # create reduced expression
+                #         reduced_expression = ''
+                #         reduced_expression += ('%s' % max_coeff)
+                #         reduced_expression += ('*Symbol("z[%s]")' % i)
+                #         reduced_expressions.append(reduced_expression)
+                #     else:
+                #         # obtain remainder of expression
+                #         removed_part_of_expression = deepcopy(sp.parse_expr(equation))
+                #         arg = 'z[%s]' % i
+                #         # substitute the non-important weights/terms with zero
+                #         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
+    
+                # print(sp.sympify(removed_part_of_expression))
+    
+            return self.flc.rules, intervals, equations, reduced_expressions
+        
+    def simplify(self, Z, MULTIPROCESSING=False, PROCESSES=2):
+        self.to_flc(Z, MULTIPROCESSING, PROCESSES)
+        return self.to_hflc(Z)

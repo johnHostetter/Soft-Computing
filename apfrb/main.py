@@ -13,12 +13,12 @@ from sklearn import datasets
 
 try:
     from .ann import iris_ann
-    from .rule_reduction import RuleReducer
     from .transformation import T
+    from .rule_reduction import RuleReducer
 except ImportError:
     from ann import iris_ann
-    from rule_reduction import RuleReducer
     from transformation import T
+    from rule_reduction import RuleReducer
     
 np.random.seed(10)
 
@@ -56,6 +56,6 @@ if __name__ == '__main__':
 
     start = time.time()
     ruleReducer = RuleReducer(apfrb)
-    print(ruleReducer.simplify(Z, MULTIPROCESSING=False))
+    rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
     end = time.time()
-    print(end-start)
+    print('%s seconds' % (end-start))
