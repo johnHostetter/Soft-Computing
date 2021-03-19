@@ -13,6 +13,7 @@ class FLC:
         self.rules = rules
         self.table = table
         self.d_memo = {}
+        
     def __u(self, x):
         """
 
@@ -30,7 +31,7 @@ class FLC:
         u = 0.0
         q = len(self.rules)
         for i in range(q):
-            u += self.rules[i].t(x) * self.rules[i].consequent
+            u += self.rules[i].t(x) * self.rules[i].consequent()
         return u
 
     def __d(self, x):
@@ -58,6 +59,7 @@ class FLC:
                 d += self.rules[i].t(x)
             self.d_memo[key] = d
             return d
+        
     def infer_with_u_and_d(self, x):
         """
         Conducts the FLC's fuzzy inference and defuzzification when given an input 'x'.
@@ -75,6 +77,7 @@ class FLC:
 
         """
         return self.__u(x) / self.__d(x)
+    
     def predict(self, D, func, ann):
         predictions = []
         for z in D:

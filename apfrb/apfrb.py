@@ -11,13 +11,15 @@ import numpy as np
 from copy import deepcopy
 
 try:
+    from .flc import FLC
     from .rule import APFRB_Rule
     from .common import logistic
 except ImportError:
+    from flc import FLC
     from rule import APFRB_Rule
     from common import logistic
 
-class APFRB:
+class APFRB(FLC):
     def __init__(self, W, v, a):
         """
         Create an All-Permutations Fuzzy Rule Base (APFRB).
@@ -156,52 +158,6 @@ class APFRB:
             diffs.append(abs(rule_i.consequent() - rule_k.consequent()))
         return (1/self.__d(x)) * max(diffs)
 
-    def __u(self, x):
-        """
-
-
-        Parameters
-        ----------
-        x : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
-        u = 0.0
-        q = self.r
-        for i in range(q):
-            u += self.rules[i].t(x) * self.rules[i].consequent()
-        return u
-
-    def __d(self, x):
-        """
-
-
-        Parameters
-        ----------
-        x : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        d : TYPE
-            DESCRIPTION.
-
-        """
-        key = hash(tuple(map(float, x)))
-        if key in self.d_memo:
-            return self.d_memo[key]
-        else:
-            d = 0.0
-            q = self.r
-            for i in range(q):
-                d += self.rules[i].t(x)
-            self.d_memo[key] = d
-            return d
-
     def __b(self, x, k):
         diffs = []
         f_k = self.rules[k].t(x)
@@ -218,25 +174,7 @@ class APFRB:
             predictions.append(prediction)
         return np.array(predictions)
 
-    def infer_with_u_and_d(self, z):
-        """
-        Conducts the APFRB's fuzzy inference and defuzzification when given a raw input 'z'.
-        Capable of execution when the APFRB is no longer equivalent to its previous ANN.
-
-        Parameters
-        ----------
-        z : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
-
-        """
-        return self.__u(z) / self.__d(z)
-
-    def inference(self, z):
+    def infer_with_ann(self, z):
         """
         Conducts the APFRB's fuzzy inference and defuzzification when given a raw input 'z'.
 

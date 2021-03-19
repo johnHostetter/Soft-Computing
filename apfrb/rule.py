@@ -34,9 +34,9 @@ class ElseRule:
         return 'ELSE %s' % self.consequent
 
 class FLC_Rule:
-    def __init__(self, antecedents, consequent):
+    def __init__(self, antecedents, consequents):
         self.antecedents = antecedents
-        self.consequent = consequent
+        self.consequents = consequents
         self.else_clause = False # by default is False, but may become True when rule ordering matters
         self.memo = {}
     def __str__(self):
@@ -55,6 +55,10 @@ class FLC_Rule:
         if self.else_clause:
             output += ' ELSE '
         return output
+    
+    def consequent(self):
+        raise Exception('FLC rule consequent is not a float.') if isinstance(self.consequents, float) else self.consequents
+
     def t(self, x):
         
         """

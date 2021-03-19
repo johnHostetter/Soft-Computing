@@ -33,14 +33,14 @@ class test_apfrb(unittest.TestCase):
         apfrb_results = np.round([self.apfrb.infer_with_u_and_d(z) for z in self.Z])
         self.assertTrue((ann_results == apfrb_results).all())
 
-    def test_inference(self):
+    def test_infer_with_ann(self):
         """
         Test that the APFRB's inference is mathematically equivalent to ANN's output.
 
         """
 
         ann_results = np.round([self.ann.forward(z) for z in self.Z])
-        apfrb_results = np.round([self.apfrb.inference(z) for z in self.Z])
+        apfrb_results = np.round([self.apfrb.infer_with_ann(z) for z in self.Z])
         self.assertTrue((ann_results == apfrb_results).all())
 
 if __name__ == '__main__':
