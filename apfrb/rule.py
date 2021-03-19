@@ -153,13 +153,14 @@ class APFRB_Rule:
 
         Returns
         -------
-        None.
+        float
+            The degree of applicability of this rule's antecedents.
 
         """
         key = hash(tuple(map(float, z)))
-        try:
+        if key in self.memo:
             return self.memo[key]
-        except KeyError:
+        else:
             degree = 1.0
             indices = list(self.antecedents.keys())
             values = list(self.antecedents.values())

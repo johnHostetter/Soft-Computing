@@ -115,3 +115,23 @@ class ANN:
             y.append(np.dot(self.W[j].T, z))
             f += self.c[j] * np.tanh(y[j] + self.b[j])
         return f
+    
+    def predict(self, Z, func=None):
+        """
+        Conduct a forward pass on each observation in the data set Z.
+
+        Parameters
+        ----------
+        Z : 2-dimensional Numpy array
+            The raw observations in the data set.
+        func : function, optional
+            A function that defines the mapping from float to labels.
+
+        Returns
+        -------
+        1-dimensional Numpy array
+            Array containing predictions for their corresponding observations in the data set Z.
+
+        """
+        results = np.array([self.forward(z) for z in Z])
+        return results if func is None else list(map(func, results))

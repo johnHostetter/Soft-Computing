@@ -8,8 +8,8 @@ Created on Wed Mar 17 17:34:13 2021
 
 import unittest
 
-from apfrb.ann import iris_ann, ANN
 from apfrb.apfrb import APFRB
+from apfrb.ann import iris_ann, ANN
 from apfrb.transformation import T, T_inv
 
 class test_T(unittest.TestCase):

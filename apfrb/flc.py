@@ -78,12 +78,34 @@ class FLC:
         """
         return self.__u(x) / self.__d(x)
     
-    def predict(self, D, func, ann):
+    def predict_with_ann(self, Z, ann, func):
+        """
+        Conduct fuzzy inference on each observation in the data set Z.
+        
+        CAUTION: This method should only be called on a Fuzzy Logic Controller AFTER it is no 
+        longer equivalent to the APFRB it originated from. Otherwise, when self.infer_with_u_and_d()
+        is called, it will receive a dictionary object. The code then calls the private method self.__u(), 
+        and later reaches self.rules[i].t(x), but this will raise a TypeError due to attempting to
+        multiply a float with a dictionary object.
+
+        Parameters
+        ----------
+        Z : 2-dimensional Numpy array
+            The raw observations in the data set.
+        ann : ANN
+            The Artificial Neural Network this Fuzzy Logic Controller was created from.
+        func : function, optional
+            A function that defines the mapping from float to labels.
+
+        Returns
+        -------
+        1-dimensional Numpy array
+            Array containing predictions for their corresponding observations in the data set Z.
+
+        """
         predictions = []
-        for z in D:
-            y = []
-            for j in range(ann.m):
-                y.append(np.dot(ann.W[j].T, z))
+        for z in Z:
+            y = [np.dot(ann.W[j].T, z) for j in range(ann.m)]
             x = dict(zip(range(1, len(y) + 1), y))
             f = self.infer_with_u_and_d(x)
             prediction = func(f)

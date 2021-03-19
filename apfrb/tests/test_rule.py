@@ -9,8 +9,8 @@ Created on Wed Mar 17 13:21:25 2021
 import unittest
 import numpy as np
 
-from apfrb.rule import LogisticTerm, ElseRule
 from apfrb.common import logistic
+from apfrb.rule import LogisticTerm, ElseRule
 
 class test_LogisticTerm(unittest.TestCase):
     def __init__(self, *args, **kwargs):

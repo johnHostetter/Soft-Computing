@@ -54,10 +54,7 @@ class APFRB(FLC):
             The Fuzzy Rule Base that is a list of rules formatted as strings.
 
         """
-        frb = []
-        for i in range(self.r):
-            frb.append(str(self.rules[i]))
-        return '\n'.join(frb)
+        return '\n'.join([str(rule) for rule in self.rules])
 
     def __deepcopy__(self, memo):
         """
@@ -95,17 +92,20 @@ class APFRB(FLC):
         self.r = pow(2, self.l) # the number of fuzzy logic rules for all permutations
         self.m = len(self.v) # the number of neurons in the hidden layer
         self.n = len(self.W[0]) # the number of raw inputs
-        self.table = list(itertools.product([False, True], repeat=self.l)) # repeat the number of times there are rule antecedents
         self.lookup = {}
         self.logistic_terms = ['smaller than', 'larger than']
-        self.rules = []
-        self.d_memo = {}
+        
+        # create the table, repeating the number of times there are rule antecedents
+        FLC.__init__(self, [], list(itertools.product([False, True], repeat=self.l)))
+                
         if self.n > self.m:
             size = self.n
         else:
             size = self.m
+        
         for key in range(size):
             self.lookup[key] = self.logistic_terms
+        
         for i in range(self.r):
             rule = self.table[i] # only contains the antecedents' term assignments
             antecedents = {(key + 1): value for key, value in enumerate(rule)} # indexed by x_i
@@ -200,11 +200,9 @@ class APFRB(FLC):
         f = self.a[0]
         x = []
         for j in range(self.m):
-            # numerator =  0.0
             y = np.dot(self.W[j].T, z)
             x.append(y)
             t = np.tanh(x[j] - self.v[j]) # ann formula
-            # return t
             if True: # disable if not interested in checking FLC consistency
                 # check FLC inference is still consistent with ann formula
                 k = self.v[j]
