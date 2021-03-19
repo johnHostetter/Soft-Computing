@@ -264,12 +264,12 @@ class APFRB:
             y = np.dot(self.W[j].T, z)
             x.append(y)
             t = np.tanh(x[j] - self.v[j]) # ann formula
-            return t
+            # return t
             if True: # disable if not interested in checking FLC consistency
                 # check FLC inference is still consistent with ann formula
                 k = self.v[j]
-                t_num = self.mu(y, k, '+') - self.mu(y, k)
-                t_den = self.mu(y, k, '+') + self.mu(y, k)
+                t_num = self.logistic(y, k, '+') - self.logistic(y, k)
+                t_den = self.logistic(y, k, '+') + self.logistic(y, k)
                 t_flc = t_num / t_den
                 if abs(t_flc - t) >= epsilon:
                     raise Exception('The error tolerance of epsilon has been violated in the APFRB\'s inference.')

@@ -55,6 +55,7 @@ if __name__ == '__main__':
     ann = iris_ann()
     apfrb = T(ann)
     print(apfrb.r)
+    exit()
 
     # import some data to play with
     iris = datasets.load_iris()

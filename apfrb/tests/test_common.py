@@ -10,7 +10,7 @@ import unittest
 
 from apfrb.common import subs
 
-class TestSubs(unittest.TestCase):
+class test_subs(unittest.TestCase):
     def test_subs_False(self):
         """
         Test that False becomes -1.0.
@@ -23,8 +23,8 @@ class TestSubs(unittest.TestCase):
         Test that True becomes 1.0.
 
         """
-        result = subs(False)
-        self.assertEqual(result, -1.0)
+        result = subs(True)
+        self.assertEqual(result, 1.0)
 
 if __name__ == '__main__':
     unittest.main()
