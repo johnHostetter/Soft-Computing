@@ -55,7 +55,6 @@ if __name__ == '__main__':
     ann = iris_ann()
     apfrb = T(ann)
     print(apfrb.r)
-    exit()
 
     # import some data to play with
     iris = datasets.load_iris()
@@ -64,9 +63,12 @@ if __name__ == '__main__':
     # y = iris.target - 1 # target values that match APFRB paper
     labels = iris.target
     
+    np.round([apfrb.inference(z) for z in Z])
+    
     start = time.time()
     ruleReducer = RuleReducer(apfrb)
     flc = ruleReducer.to_flc(Z, True)
+        
     # rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
     z = Z[0]
     y = []

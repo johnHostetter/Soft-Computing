@@ -12,8 +12,10 @@ from copy import deepcopy
 
 try:
     from .rule import APFRB_Rule
+    from .common import logistic
 except ImportError:
     from rule import APFRB_Rule
+    from common import logistic
 
 class APFRB:
     def __init__(self, W, v, a):
@@ -268,36 +270,11 @@ class APFRB:
             if True: # disable if not interested in checking FLC consistency
                 # check FLC inference is still consistent with ann formula
                 k = self.v[j]
-                t_num = self.logistic(y, k, '+') - self.logistic(y, k)
-                t_den = self.logistic(y, k, '+') + self.logistic(y, k)
+                t_num = logistic(y, k, '+') - logistic(y, k)
+                t_den = logistic(y, k, '+') + logistic(y, k)
                 t_flc = t_num / t_den
                 if abs(t_flc - t) >= epsilon:
                     raise Exception('The error tolerance of epsilon has been violated in the APFRB\'s inference.')
             j += 1 # look-ahead by 1 (to avoid the first entry which is the output node's bias)
             f += self.a[j] * t
         return f
-
-    def logistic(self, y, k, t='-'):
-        """
-        The logistic membership function.
-
-        Parameters
-        ----------
-        y : float
-            The input.
-        k : float
-            The bias (for logistic functions, k_i = v_i for all i in 1, 2, ... m).
-        t : string, optional
-            Adjusts whether this logistic membership function is describing term- or term+.
-            The default is '-'.
-
-        Returns
-        -------
-        float
-            The degree of membership.
-
-        """
-        val = 2.0
-        if t == '+':
-            val = -2.0
-        return 1.0 / (1.0 + np.exp(val * (y-k)))
