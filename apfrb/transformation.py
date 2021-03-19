@@ -11,7 +11,7 @@ import numpy as np
 try:
     from .ann import ANN
     from .apfrb import APFRB
-    from rule import LogisticTerm, FLC_Rule
+    from .rule import LogisticTerm, FLC_Rule
 except ImportError:
     from ann import ANN
     from apfrb import APFRB
