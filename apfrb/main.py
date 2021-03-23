@@ -12,11 +12,11 @@ import sympy as sp
 from sklearn import datasets
 
 try:
-    from .ann import iris_ann
+    from .ann import iris_ann, ANN
     from .transformation import T
     from .rule_reduction import RuleReducer
 except ImportError:
-    from ann import iris_ann
+    from ann import iris_ann, ANN
     from transformation import T
     from rule_reduction import RuleReducer
     
@@ -79,7 +79,7 @@ def read(equations):
     for equation in equations:
         print(sp.sympify(equation))
     
-def infer(flc, Z, i):
+def infer(flc, ann, Z, i):
     z = Z[i]
     y = []
     for j in range(ann.m):
@@ -87,7 +87,13 @@ def infer(flc, Z, i):
     x = dict(zip(range(1, len(y) + 1), y))
     return flc.infer_with_u_and_d(x)
 
-if __name__ == '__main__':
+def pyrenees_ann():
+    from tensorflow.keras.models import load_model
+    model = load_model('test_model_classification.h5')
+    return ANN(model.trainable_weights[0].numpy().T, model.trainable_weights[1].numpy().T, 
+              model.trainable_weights[2].numpy().T[0], model.trainable_weights[3].numpy()[0])
+
+def iris_example():
     ann = iris_ann()
     apfrb = T(ann)
     print(apfrb.r)
@@ -101,15 +107,23 @@ if __name__ == '__main__':
     # Z = scaler.transform(Z)
     labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
     
-    apfrb.predict_with_ann(Z, ann, iris_classification)
+    # apfrb.predict_with_ann(Z, ann, iris_classification)
     
     # np.round([apfrb.inference(z) for z in Z])
     
     # start = time.time()
-    # ruleReducer = RuleReducer(apfrb)
-    # flc = ruleReducer.to_flc(Z, True)
+    ruleReducer = RuleReducer(apfrb)
+    flc = ruleReducer.to_flc(Z, True)
         
-    # # rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
+    # rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
+    
+    from common import foo, foobar
+    
+    ordered_table, ordered_rules = foo(flc.table, flc.rules)
+    
+    filtered_rules = foobar(ordered_table, ordered_rules)
+    rules = filtered_rules
+    
     # z = Z[0]
     # y = []
     # for j in range(ann.m):
@@ -118,3 +132,14 @@ if __name__ == '__main__':
     # mu = flc.rules[0].t(x)
     # end = time.time()
     # print('%s seconds' % (end-start))
+    # print(flc)
+    return apfrb, ann, rules, ruleReducer
+    
+def pyrenees():
+    ann = pyrenees_ann()
+    apfrb = T(ann)
+    print(apfrb)
+    return apfrb
+
+if __name__ == '__main__':
+    apfrb, ann, rules, reducer = iris_example()

@@ -14,7 +14,19 @@ class FLC:
         self.table = table
         self.d_memo = {}
         
-    def __u(self, x):
+    def __str__(self):
+        """
+        Get the Fuzzy Rule Base as a list of strings.
+
+        Returns
+        -------
+        frb : list
+            The Fuzzy Rule Base that is a list of rules formatted as strings.
+
+        """
+        return '\n'.join([str(rule) for rule in self.rules])
+        
+    def u(self, x):
         """
 
 
@@ -34,7 +46,7 @@ class FLC:
             u += self.rules[i].t(x) * self.rules[i].consequent()
         return u
 
-    def __d(self, x):
+    def d(self, x):
         """
 
 
@@ -76,7 +88,7 @@ class FLC:
             DESCRIPTION.
 
         """
-        return self.__u(x) / self.__d(x)
+        return self.u(x) / self.d(x)
     
     def predict_with_ann(self, Z, ann, func):
         """

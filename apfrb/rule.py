@@ -19,26 +19,36 @@ class LogisticTerm:
         self.type = neg_or_pos
         self.__logistic = logistic
         self.memo = {}
+        
     def __str__(self):
         if self.type == "+":
             return ("larger than %s" % self.k)
         else:
             return ("smaller than %s" % self.k)
+        
     def mu(self, x):
         return self.__logistic(x, self.k, self.type)
 
 class ElseRule:
-    def __init__(self, consequent):
-        self.consequent = consequent
+    def __init__(self, consequents):
+        self.consequents = consequents
+    
     def __str__(self):
-        return 'ELSE %s' % self.consequent
+        return 'ELSE %s' % self.consequent()
+    
+    def consequent(self):
+        if isinstance(self.consequents, float):
+            return self.consequents
+        else:
+            raise Exception('FLC rule consequent is not a float.')
 
 class FLC_Rule:
-    def __init__(self, antecedents, consequents):
+    def __init__(self, antecedents, consequents, else_clause=None):
         self.antecedents = antecedents
         self.consequents = consequents
-        self.else_clause = False # by default is False, but may become True when rule ordering matters
+        self.else_clause = else_clause # by default is None, but may contain some rules when ordering matters
         self.memo = {}
+        
     def __str__(self):
         output = 'IF'
         iterations = 0
@@ -50,14 +60,17 @@ class FLC_Rule:
             if iterations < limit - 1:
                 output += ' AND'
             iterations += 1
-        temp = (' THEN f(x) = %s' % self.consequent)
+        temp = (' THEN f(x) = %s' % self.consequent())
         output += temp
-        if self.else_clause:
+        if self.else_clause is None:
             output += ' ELSE '
         return output
     
     def consequent(self):
-        raise Exception('FLC rule consequent is not a float.') if isinstance(self.consequents, float) else self.consequents
+        if isinstance(self.consequents, float):
+            return self.consequents
+        else:
+            raise Exception('FLC rule consequent is not a float.')
 
     def t(self, x):
         

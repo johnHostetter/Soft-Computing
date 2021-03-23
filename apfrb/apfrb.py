@@ -44,18 +44,6 @@ class APFRB(FLC):
         self.a = a # a vector of size m + 1 (since it includes a_0 - the output node's bias)
         self.__reset() # reset/initialize all the variables that are dependent upon 'W', 'v' or 'a'
 
-    def __str__(self):
-        """
-        Get the Fuzzy Rule Base as a list of strings.
-
-        Returns
-        -------
-        frb : list
-            The Fuzzy Rule Base that is a list of rules formatted as strings.
-
-        """
-        return '\n'.join([str(rule) for rule in self.rules])
-
     def __deepcopy__(self, memo):
         """
         Returns a deep copy of the original APFRB.
@@ -156,7 +144,7 @@ class APFRB(FLC):
         for i in range(len(self.rules)):
             rule_i = self.rules[i]
             diffs.append(abs(rule_i.consequent() - rule_k.consequent()))
-        return (1/self.__d(x)) * max(diffs)
+        return (1/self.d(x)) * max(diffs)
 
     def __b(self, x, k):
         diffs = []

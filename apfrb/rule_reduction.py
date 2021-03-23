@@ -319,7 +319,59 @@ class RuleReducer:
 
         self.flc = FLC(flc_rules, np.where(table, 1, 0))
         return self.flc
-
+    
+    def step_5(self):
+        # NOTE: flc table becomes inconsistent after this step
+        new_table = []
+        max_length = len(self.flc.table)
+        remaining_search_space = np.matrix(deepcopy(self.flc.table))
+        while remaining_search_space.shape[0] > 2:
+            col = remaining_search_space[:,0] # get the first column of the remaining search space
+            col = np.resize(col, (len(col), ))
+            nonzero_count = np.count_nonzero(col)
+            if nonzero_count == 1:
+                # term+ occurs only once across all rules on the i'th antecedent
+                indices = np.where(col > 0)
+                new_col = np.where(col > 0, col, None)
+                new_col = list(new_col)
+                if len(new_col) < max_length:
+                    new_col.extend([None]*(max_length - len(new_col)))
+            elif nonzero_count == len(self.flc.rules) - 1:
+                # term- occurs only once across all rules on the i'th antecedent
+                indices = np.where(col != 0)
+                new_col = np.where(col > 0, None, col)
+                new_col = list(new_col)
+                new_col.extend([None]*(max_length - len(new_col)))
+                if len(new_col) < max_length:
+                    new_col.extend([None]*(max_length - len(new_col)))
+            if not isinstance(new_col, list):
+                new_col = list(new_col)
+            new_table.append(new_col)
+            
+            remaining_search_space = remaining_search_space[:(len(remaining_search_space)-1), 1:]
+        new_table.append(remaining_search_space) # TODO: add missing entries on remaining search space
+        
+        
+        return new_table
+            
+        # for i in range(self.flc.table.shape[1]): # iterate through each column
+        #     col = self.flc.table[:,i]
+        #     nonzero_count = np.count_nonzero(col)
+            
+        #     if nonzero_count == 1:
+        #         # term+ occurs only once across all rules on the i'th antecedent
+        #         indices = np.where(col > 0)
+        #         new_col = np.where(col > 0, col, None)
+        #     elif nonzero_count == len(self.flc.rules) - 1:
+        #         # term- occurs only once across all rules on the i'th antecedent
+        #         indices = np.where(col != 0)
+        #         new_col = np.where(col > 0, None, col)
+        #     else:
+        #         # no reduction possible for this antecedent
+        #         continue
+        #     new_table.append(new_col)
+        # return new_table
+            
     
     def to_flc(self, Z, MULTIPROCESSING=False, PROCESSES=2):
         """
@@ -360,6 +412,10 @@ class RuleReducer:
             
             table = np.matrix(self.apfrb.table) # TEMPORARY FIX
             
+            self.step_5()
+            
+            return [], [], [], []
+            
             # table = np.matrix(self.table)
             for i in range(len(np.squeeze(np.asarray(table))[0])):
                 col = np.squeeze(np.array(table[:,i]))
@@ -394,9 +450,9 @@ class RuleReducer:
             consequent_frequency = {} # find the frequency for each rule's consequent term
             for flc_rule in self.flc.rules:
                 try:
-                    consequent_frequency[flc_rule.consequent] += 1
+                    consequent_frequency[flc_rule.consequent()] += 1
                 except KeyError:
-                    consequent_frequency[flc_rule.consequent] = 1
+                    consequent_frequency[flc_rule.consequent()] = 1
             # return the dictionary key that has the maximum value
             # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
             max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
