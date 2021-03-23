@@ -128,6 +128,49 @@ def foobar(unprocessed_tables, unprocesssed_hierarchical_flc_rules):
         else:
             raise Exception('Invalid input. Something went wrong.')
     return filtered_flc_rules
+
+def barfoo(ordered_matrices, ordered_flc_rules):
+    from flc import FLC
+    from rule import FLC_Rule
+    copied_matrices = deepcopy(ordered_matrices)
+    copied_flc_rules = deepcopy(ordered_flc_rules)
+    next_idx = len(copied_flc_rules) - 1
+    curr_idx = next_idx - 1
+    else_clause = None
+
+    while next_idx >= 0:
+        next_table = copied_matrices[next_idx]
+        next_item = copied_flc_rules[next_idx]
+        if isinstance(next_item, list):
+            else_clause = FLC(next_item, next_table)
+        elif isinstance(next_item, FLC_Rule):
+            next_item.else_clause = else_clause
+            else_clause = next_item
+        else:
+            raise Exception('Invalid input. Something went wrong.')
+        next_idx -= 1
+        curr_idx -= 1
+        
+    return next_item
+
+def barbar(hierarchical_rule):
+    from flc import FLC
+    rule = hierarchical_rule
+    while not isinstance(rule, FLC):
+        rule = rule.else_clause
+        
+    main_rule = rule.rules[0]
+    idx = 1
+    while True:
+        flc_rule = rule.rules[idx]
+        main_rule.else_clause = flc_rule
+        main_rule = main_rule.else_clause
+        rule.rules.pop(idx)
+        if len(rule.rules) == 1:
+            main_rule.default_class = True
+            break
+    return hierarchical_rule
+            
 # def foo(matrix):
 #     try:
 #         size = matrix.shape[1]

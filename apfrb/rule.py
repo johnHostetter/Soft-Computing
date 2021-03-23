@@ -47,9 +47,12 @@ class FLC_Rule:
         self.antecedents = antecedents
         self.consequents = consequents
         self.else_clause = else_clause # by default is None, but may contain some rules when ordering matters
+        self.default_class = False
         self.memo = {}
         
     def __str__(self):
+        if self.default_class:
+            return str(self.consequent())
         output = 'IF'
         iterations = 0
         limit = len(self.antecedents.keys())
@@ -62,8 +65,10 @@ class FLC_Rule:
             iterations += 1
         temp = (' THEN f(x) = %s' % self.consequent())
         output += temp
-        if self.else_clause is None:
-            output += ' ELSE '
+        if self.else_clause is not None:
+            output += ' ELSE;'
+            output += '\n'
+            output += str(self.else_clause)
         return output
     
     def consequent(self):

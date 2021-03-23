@@ -124,6 +124,10 @@ def iris_example():
     filtered_rules = foobar(ordered_table, ordered_rules)
     rules = filtered_rules
     
+    from common import barfoo
+    
+    result = barfoo(ordered_table, rules)
+    
     # z = Z[0]
     # y = []
     # for j in range(ann.m):
@@ -133,7 +137,7 @@ def iris_example():
     # end = time.time()
     # print('%s seconds' % (end-start))
     # print(flc)
-    return apfrb, ann, rules, ruleReducer
+    return apfrb, ann, rules, ordered_table, ruleReducer, result
     
 def pyrenees():
     ann = pyrenees_ann()
@@ -142,4 +146,6 @@ def pyrenees():
     return apfrb
 
 if __name__ == '__main__':
-    apfrb, ann, rules, reducer = iris_example()
+    apfrb, ann, rules, tables, reducer, result = iris_example()
+    from common import barbar
+    res = barbar(result)
