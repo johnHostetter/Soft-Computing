@@ -157,17 +157,21 @@ def barbar(hierarchical_rule):
     from flc import FLC
     rule = hierarchical_rule
     while not isinstance(rule, FLC):
+        rule.ordinary_logic = True
         rule = rule.else_clause
         
     main_rule = rule.rules[0]
     idx = 1
     while True:
         flc_rule = rule.rules[idx]
+        flc_rule.ordinary_logic = True
         main_rule.else_clause = flc_rule
+        main_rule.ordinary_logic = True
         main_rule = main_rule.else_clause
         rule.rules.pop(idx)
         if len(rule.rules) == 1:
             main_rule.default_class = True
+            main_rule.ordinary_logic = True
             break
     return hierarchical_rule
             

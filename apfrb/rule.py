@@ -9,8 +9,10 @@ Created on Sun Feb 21 21:51:30 2021
 import numpy as np
 
 try:
+    from .flc import FLC
     from .common import subs, logistic
 except ImportError:
+    from flc import FLC
     from common import subs, logistic
 
 class LogisticTerm:
@@ -47,7 +49,9 @@ class FLC_Rule:
         self.antecedents = antecedents
         self.consequents = consequents
         self.else_clause = else_clause # by default is None, but may contain some rules when ordering matters
-        self.default_class = False
+        self.default_class = False # by default is False, becomes True when this rule's consequent is the default class
+        self.ordinary_logic = False # by default is False, becomes True when rule is either valid or not
+        self.threshold = 0.9 # the activation threshold required for the rule to be valid
         self.memo = {}
         
     def __str__(self):
@@ -76,6 +80,20 @@ class FLC_Rule:
             return self.consequents
         else:
             raise Exception('FLC rule consequent is not a float.')
+            
+    def __crisp_logic(self, x, degree):
+        if not self.ordinary_logic:
+            return degree
+        else:
+            if degree < self.threshold:
+                try:
+                    return self.else_clause.t(x)
+                except AttributeError:
+                    if isinstance(self.else_clause, FLC):
+                        return self.else_clause.rules[0].t(x)
+                # return 0
+            else:
+                return self.consequent()
 
     def t(self, x):
         
@@ -94,13 +112,13 @@ class FLC_Rule:
         """
         key = hash(tuple(map(float, list(x.values()))))
         if key in self.memo:
-            return self.memo[key]
+            return self.__crisp_logic(x, self.memo[key])
         else:
             degree = 1.0
             for key in self.antecedents.keys():
                 degree *= self.antecedents[key].mu(x[key])
             self.memo[key] = degree
-            return degree
+            return self.__crisp_logic(x, degree)
 
 class APFRB_Rule:
     def __init__(self, antecedents, consequents, lookup, W, v):

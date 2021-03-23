@@ -42,7 +42,7 @@ class test_flc(unittest.TestCase):
 
         """
 
-        flc_results = self.apfrb.predict_with_ann(self.Z, iris_classification, self.ann)
+        flc_results = self.apfrb.predict_with_ann(self.Z, self.ann, iris_classification)
         apfrb_results = np.round([self.apfrb.infer_with_ann(z) for z in self.Z])
         self.assertTrue((ann_results == apfrb_results).all())
 

@@ -149,3 +149,16 @@ if __name__ == '__main__':
     apfrb, ann, rules, tables, reducer, result = iris_example()
     from common import barbar
     res = barbar(result)
+    # import some data to play with
+    iris = datasets.load_iris()
+    labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
+    Z = iris.data[:, :4]  # we only take the first four features.
+    Z = np.flip(Z, axis = 1)
+    hflc_pred = []
+    for z in Z:
+        y = []
+        for j in range(ann.m):
+            y.append(np.dot(ann.W[j].T, z))
+        x = dict(zip(range(1, len(y) + 1), y))
+        hflc_pred.append(res.t(x))
+    
