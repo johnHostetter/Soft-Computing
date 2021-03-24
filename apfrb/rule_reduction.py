@@ -343,12 +343,14 @@ class RuleReducer:
     def step_5(self):
         ordered_table, ordered_rules = foo(self.flc.table, self.flc.rules)
         filtered_rules = foobar(ordered_table, ordered_rules)
-        return ordered_table, filtered_rules
+        from common import delete_rules_with_default_consequent
+        ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
+        return ordered_table, filtered_rules, default
     
-    def step_6(self, ordered_table, filtered_rules):
+    def step_6(self, ordered_table, filtered_rules, default):
         # TODO: need to add it so that all rules that have 
         # the default class as the consequent are deleted as well
-        return barbar(barfoo(ordered_table, filtered_rules))
+        return barbar(barfoo(ordered_table, filtered_rules), default)
     
     def to_flc(self, Z, MULTIPROCESSING=False, PROCESSES=2):
         """
@@ -381,9 +383,8 @@ class RuleReducer:
         if self.flc is None:
             print('This RuleReducer object does not have a saved instance of a FLC. Please run \'to_flc\' first.')
         else:
-            ordered_table, filtered_rules = self.step_5()
-            results = self.step_6(ordered_table, filtered_rules)
-            return results
+            ordered_table, filtered_rules, default = self.step_5()
+            results = self.step_6(ordered_table, filtered_rules, default)
     
             # step 7
     
@@ -430,7 +431,7 @@ class RuleReducer:
                     if i + 1 < n:
                         equation += '+'
                 equations.append(equation)
-    
+                    
             parsed_expressions = []
             reduced_expressions = []
             for equation in equations:
@@ -478,6 +479,38 @@ class RuleReducer:
                 reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
                 reduced_expression += ('+%s' % summation)
                 reduced_expressions.append(reduced_expression)
+            
+            # NEW CODE
+            
+            # go through each rule's antecedents, and substitute its antecedents with original attributes
+            from rule import FLC_Rule
+            from rule import OrdinaryTerm
+            new_results = deepcopy(results)
+            current_rule = new_results
+            while True:
+                try:
+                    for idx, key in enumerate(current_rule.antecedents.keys()):
+                        current_expression = reduced_expressions[key - 1]
+                        term = current_rule.antecedents[key]
+                        copied_current_expression = deepcopy(current_expression)
+                        if term.type == '+':
+                            copied_current_expression += ' > '
+                        elif term.type == '-':
+                            copied_current_expression += ' < '
+                        else:
+                            raise Exception('Invalid input. Something went wrong.')
+                        copied_current_expression += str(term.k)
+                        sympy_simplified_expr = sp.simplify(sp.sympify(copied_current_expression))
+                        current_rule.antecedents[key] = OrdinaryTerm(sympy_simplified_expr, key - 1)
+
+                    current_rule = current_rule.else_clause
+                    
+                except AttributeError:
+                    if isinstance(current_rule, FLC):
+                        current_rule = current_rule.rules[0]
+                    else:
+                        break
+            return new_results
     
                 # for i in range(n):
                 #     if i == (z_idx - 1):
@@ -494,8 +527,8 @@ class RuleReducer:
                 #         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
     
                 # print(sp.sympify(removed_part_of_expression))
-    
-            return self.flc.rules, intervals, equations, reduced_expressions
+            return results
+            # return self.flc.rules, intervals, equations, reduced_expressions
         
     def simplify(self, Z, classification=False, MULTIPROCESSING=False, PROCESSES=2):
         self.to_flc(Z, MULTIPROCESSING, PROCESSES)

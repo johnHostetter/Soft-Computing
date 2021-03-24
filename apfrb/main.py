@@ -115,24 +115,26 @@ def iris_example():
     
     # start = time.time()
     ruleReducer = RuleReducer(apfrb)
-    flc = ruleReducer.to_flc(Z, True)
+    # flc = ruleReducer.to_flc(Z, True)
         
-    # return ruleReducer.simplify(Z, True, MULTIPROCESSING=False)
+    result = ruleReducer.simplify(Z, True, MULTIPROCESSING=False)
     
-    from common import foo, foobar
+    flc = ruleReducer.flc
     
-    ordered_table, ordered_rules = foo(flc.table, flc.rules)
+    # from common import foo, foobar
     
-    filtered_rules = foobar(ordered_table, ordered_rules)
+    # ordered_table, ordered_rules = foo(flc.table, flc.rules)
     
-    from common import delete_rules_with_default_consequent
+    # filtered_rules = foobar(ordered_table, ordered_rules)
     
-    ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
+    # from common import delete_rules_with_default_consequent
     
-    from common import barfoo, barbar
+    # ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
     
-    result = barfoo(ordered_table, filtered_rules)
-    result = barbar(result, default)
+    # from common import barfoo, barbar
+    
+    # result = barfoo(ordered_table, filtered_rules)
+    # result = barbar(result, default)
     
     return ann, apfrb, flc, result
     
@@ -203,10 +205,15 @@ if __name__ == '__main__':
     Z = iris.data[:, :4]  # we only take the first four features.
     Z = np.flip(Z, axis = 1)
     hflc_pred = []
+    
     for idx, z in enumerate(Z):
-        y = []
-        for j in range(ann.m):
-            y.append(np.dot(ann.W[j].T, z))
-        x = dict(zip(range(1, len(y) + 1), y))
+        x = dict(zip(range(1, len(z) + 1), z))
         hflc_pred.append(result.t(x))
+    
+    # for idx, z in enumerate(Z):
+    #     y = []
+    #     for j in range(ann.m):
+    #         y.append(np.dot(ann.W[j].T, z))
+    #     x = dict(zip(range(1, len(y) + 1), y))
+    #     hflc_pred.append(result.t(x))
     

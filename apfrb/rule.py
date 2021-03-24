@@ -7,6 +7,7 @@ Created on Sun Feb 21 21:51:30 2021
 """
 
 import numpy as np
+from sympy import Symbol
 
 try:
     from .flc import FLC
@@ -14,6 +15,49 @@ try:
 except ImportError:
     from flc import FLC
     from common import subs, logistic
+    
+class OrdinaryTerm:
+    def __init__(self, sympy_expr_interval, z_i):
+        """
+        z_i is the raw data index that the sympy expression interval is conditioned on
+
+        Parameters
+        ----------
+        sympy_expr_interval : TYPE
+            DESCRIPTION.
+        z_i : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.sympy_expr_interval = sympy_expr_interval
+        self.z_i = z_i
+        
+    def __str__(self):
+        return str(self.sympy_expr_interval)
+    
+    def mu(self, x):
+        """
+        where x is a raw observation
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        arg = 'z[%s]' % self.z_i
+        if self.sympy_expr_interval.subs(Symbol(arg), x):
+            return 1.0
+        else:
+            return 0.0
 
 class LogisticTerm:
     def __init__(self, k, neg_or_pos):
