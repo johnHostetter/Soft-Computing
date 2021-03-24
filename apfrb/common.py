@@ -169,17 +169,19 @@ def barbar(hierarchical_rule, default):
     main_rule = rule.rules[0]
     idx = 1
     while True:
+        if len(rule.rules) == 1:
+            # main_rule.default_class = True
+            main_rule.ordinary_logic = True
+            main_rule.else_clause = default
+            # we no longer need the fuzzy logic controller class, there is only one rule left
+            return hierarchical_rule
+            break
         flc_rule = rule.rules[idx]
         flc_rule.ordinary_logic = True
         main_rule.else_clause = flc_rule
         main_rule.ordinary_logic = True
         main_rule = main_rule.else_clause
         rule.rules.pop(idx)
-        if len(rule.rules) == 1:
-            # main_rule.default_class = True
-            main_rule.ordinary_logic = True
-            main_rule.else_clause = default
-            break
     return hierarchical_rule
 
 # def barbar(hierarchical_rule):
@@ -212,9 +214,9 @@ def default_consequent(ordered_table, filtered_rules):
         if isinstance(item, FLC_Rule):
             consequent = item.consequent()
             if consequent in consequent_frequency:
-                consequent_frequency[consequent] += 1
+                consequent_frequency[consequent] += 0
             else:
-                consequent_frequency[consequent] = 1
+                consequent_frequency[consequent] = 0
         elif isinstance(item, list):
             for flc_rule in item:
                 consequent = flc_rule.consequent()
@@ -250,7 +252,7 @@ def delete_rules_with_default_consequent(ordered_table, filtered_rules):
             ordered_table.pop(index)
             filtered_rules.pop(index)
         elif isinstance(index, tuple):
-            ordered_table[index[0]].pop(index[1])
+            ordered_table = np.delete(ordered_table[index[0]], index[1], axis=1)
             filtered_rules[index[0]].pop(index[1])
         else:
             raise Exception('Invalid input. Something went wrong.')

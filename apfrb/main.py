@@ -131,9 +131,10 @@ def iris_example():
     
     from common import barfoo, barbar
     
-    result = barbar(barfoo(ordered_table, filtered_rules), default)
+    result = barfoo(ordered_table, filtered_rules)
+    result = barbar(result, default)
     
-    return result
+    return ann, apfrb, flc, result
     
     # z = Z[0]
     # y = []
@@ -147,7 +148,7 @@ def iris_example():
     # return result
 
 def random_example():
-    Z, labels, ann = random_data_with_ann(150, 4, 5)
+    Z, labels, ann = random_data_with_ann(150, 4, 7)
     
     apfrb = T(ann)
     
@@ -194,19 +195,18 @@ if __name__ == '__main__':
     # from common import barfoo
     
     # result = barfoo(ordered_table, filtered_rules)
-    result = iris_example()
-    # from common import barbar
-    # res = barbar(result)
-    # # import some data to play with
-    # iris = datasets.load_iris()
-    # labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
-    # Z = iris.data[:, :4]  # we only take the first four features.
-    # Z = np.flip(Z, axis = 1)
-    # hflc_pred = []
-    # for z in Z:
-    #     y = []
-    #     for j in range(ann.m):
-    #         y.append(np.dot(ann.W[j].T, z))
-    #     x = dict(zip(range(1, len(y) + 1), y))
-    #     hflc_pred.append(res.t(x))
+    ann, apfrb, flc, result = iris_example()
+
+    # import some data to play with
+    iris = datasets.load_iris()
+    labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
+    Z = iris.data[:, :4]  # we only take the first four features.
+    Z = np.flip(Z, axis = 1)
+    hflc_pred = []
+    for idx, z in enumerate(Z):
+        y = []
+        for j in range(ann.m):
+            y.append(np.dot(ann.W[j].T, z))
+        x = dict(zip(range(1, len(y) + 1), y))
+        hflc_pred.append(result.t(x))
     

@@ -78,6 +78,8 @@ class FLC_Rule:
                 except AttributeError:
                     if isinstance(self.else_clause, FLC):
                         return self.else_clause.rules[0].t(x)
+                    elif isinstance(self.else_clause, float): # default class
+                        return self.else_clause
                 # return 0
             else:
                 return self.consequent()
