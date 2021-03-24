@@ -100,6 +100,9 @@ def foo(matrix, flc_rules):
             col_idx = 0 # reset the search
         else:
             col_idx += 1
+            if not col_idx < copied_matrix.shape[1]:
+                matrices.append(copied_matrix)
+                ordered_rules.append(copied_flc_rules)
     return matrices, ordered_rules
 
 def foobar(unprocessed_tables, unprocesssed_hierarchical_flc_rules):

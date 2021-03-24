@@ -67,6 +67,7 @@ def iris_ann():
     return ANN(W, b, c, 0.0)
 
 def random_data_with_ann(n_rows=150, n_inputs=3, n_neurons=6):
+    np.random.seed(13)
     ann = random_ann(n_inputs, n_neurons)
     data = np.random.random(size=(n_rows, n_inputs))
     return data, ann.predict(data), ann

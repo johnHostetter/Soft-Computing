@@ -305,19 +305,41 @@ class RuleReducer:
             flc_rules.append(APFRB_rule_to_FLC_rule(apfrb_rule))
 
         # step 4
-        table = np.matrix(self.apfrb.table) # TODO: update self.table so it is consistent with the new table
+        table = deepcopy(np.where(self.apfrb.table, 1, 0))
+        table = table.astype('float32')
+        # table = np.matrix(self.apfrb.table) # TODO: update self.table so it is consistent with the new table
         # for i in range(len(self.table[0])):
-        i = 0
-        while i < table[0].shape[1]:
-            if np.all(table[:,i] == table[:,i][0]):
-                print('\nDelete antecedent x_%s from all the rules.' % i)
-                for flc_rule in flc_rules:
-                    del flc_rule.antecedents[i + 1]
-                table = np.delete(table, i, axis=1)
-            else:
-                i += 1
+        
+        # identify the antecedents to be deleted by traversing the table
+        antecedents_to_delete = []
+        for col_idx in range(table.shape[1]):
+            col = table[:,col_idx]
+            # either all elements in the column are 1 or all elements in the column are 0
+            if sum(col) == table.shape[0] or sum(col) == 0:
+                antecedents_to_delete.append(col_idx + 1) # plus 1 since the antecedents begin count from '1'
+        
+        # delete the antecedents from the fuzzy logic control rules
+        for flc_rule in flc_rules:
+            for key in antecedents_to_delete:
+                del flc_rule.antecedents[key]
+        
+        # mark the table's columns that correspond with antecedents that were deleted
+        for col_idx in antecedents_to_delete:
+            table[:,(col_idx - 1)] = np.array([np.nan]*table.shape[0]) # offset the column index by negative 1 since we added 1 earlier
+            
+        # update the table to reflect the fuzzy logic controller after the deletions
+        col_idx = 0
+        while True:
+            try:
+                col = table[:,col_idx]
+                if np.isnan(col).all():
+                    table = np.hstack((table[:,:col_idx], table[:,(col_idx+1):]))
+                else:
+                    col_idx += 1
+            except IndexError:
+                break
 
-        self.flc = FLC(flc_rules, np.where(table, 1, 0))
+        self.flc = FLC(flc_rules, table)
         return self.flc
     
     def step_5(self):

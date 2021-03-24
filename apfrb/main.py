@@ -142,7 +142,7 @@ def iris_example():
     return apfrb, ann, rules, ordered_table, ruleReducer, result
 
 def random_example():
-    Z, labels, ann = random_data_with_ann(150, 4, 8)
+    Z, labels, ann = random_data_with_ann(150, 4, 5)
     
     apfrb = T(ann)
     
