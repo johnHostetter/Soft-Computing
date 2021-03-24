@@ -308,7 +308,7 @@ class RuleReducer:
         table = np.matrix(self.apfrb.table) # TODO: update self.table so it is consistent with the new table
         # for i in range(len(self.table[0])):
         i = 0
-        while i < len(table[0]):
+        while i < table[0].shape[1]:
             if np.all(table[:,i] == table[:,i][0]):
                 print('\nDelete antecedent x_%s from all the rules.' % i)
                 for flc_rule in flc_rules:

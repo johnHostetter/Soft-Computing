@@ -12,13 +12,15 @@ import sympy as sp
 from sklearn import datasets
 
 try:
-    from .ann import iris_ann, ANN
+    from .ann import iris_ann, random_data_with_ann, ANN
     from .transformation import T
     from .rule_reduction import RuleReducer
+    from .common import foo, foobar
 except ImportError:
-    from ann import iris_ann, ANN
+    from ann import iris_ann, random_data_with_ann, ANN
     from transformation import T
     from rule_reduction import RuleReducer
+    from common import foo, foobar
     
 np.random.seed(10)
 
@@ -138,7 +140,33 @@ def iris_example():
     # print('%s seconds' % (end-start))
     # print(flc)
     return apfrb, ann, rules, ordered_table, ruleReducer, result
+
+def random_example():
+    Z, labels, ann = random_data_with_ann(150, 4, 8)
     
+    apfrb = T(ann)
+    
+    from common import line
+    
+    vals = []
+    for rule in apfrb.rules:
+        vals.append(rule.consequent())
+        
+    line(range(len(vals)), vals, 'apfrb', '', '')
+    line(range(len(vals)), sorted(vals), 'sorted apfrb', '', '')
+    
+    ruleReducer = RuleReducer(apfrb)
+    flc = ruleReducer.to_flc(Z, False)
+
+    vals = []
+    for rule in flc.rules:
+        vals.append(rule.consequent())
+        
+    line(range(len(vals)), vals, 'flc', '', '')
+    line(range(len(vals)), sorted(vals), 'sorted flc', '', '')
+    
+    return apfrb, flc, ruleReducer
+        
 def pyrenees():
     ann = pyrenees_ann()
     apfrb = T(ann)
@@ -146,19 +174,34 @@ def pyrenees():
     return apfrb
 
 if __name__ == '__main__':
-    apfrb, ann, rules, tables, reducer, result = iris_example()
-    from common import barbar
-    res = barbar(result)
-    # import some data to play with
-    iris = datasets.load_iris()
-    labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
-    Z = iris.data[:, :4]  # we only take the first four features.
-    Z = np.flip(Z, axis = 1)
-    hflc_pred = []
-    for z in Z:
-        y = []
-        for j in range(ann.m):
-            y.append(np.dot(ann.W[j].T, z))
-        x = dict(zip(range(1, len(y) + 1), y))
-        hflc_pred.append(res.t(x))
+    # table = np.array([[0, 1, 1, 1, 1],
+    #    [1, 0, 1, 1, 1],
+    #    [1, 1, 0, 1, 1],
+    #    [1, 1, 1, 0, 1],
+    #    [1, 1, 1, 1, 0],
+    #    [1, 1, 1, 1, 1]])
+    # rls = list(range(table.shape[0]))
+    # res = foo(table, rls)
+    apfrb, flc, reducer = random_example()
+    ordered_table, ordered_rules = foo(flc.table, flc.rules)
+    filtered_rules = foobar(ordered_table, ordered_rules)
+    
+    from common import barfoo
+    
+    result = barfoo(ordered_table, filtered_rules)
+    # apfrb, ann, rules, tables, reducer, result = iris_example()
+    # from common import barbar
+    # res = barbar(result)
+    # # import some data to play with
+    # iris = datasets.load_iris()
+    # labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
+    # Z = iris.data[:, :4]  # we only take the first four features.
+    # Z = np.flip(Z, axis = 1)
+    # hflc_pred = []
+    # for z in Z:
+    #     y = []
+    #     for j in range(ann.m):
+    #         y.append(np.dot(ann.W[j].T, z))
+    #     x = dict(zip(range(1, len(y) + 1), y))
+    #     hflc_pred.append(res.t(x))
     

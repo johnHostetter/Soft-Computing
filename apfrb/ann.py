@@ -66,6 +66,11 @@ def iris_ann():
         raise Exception('The vector \'b\' must equal the vector \'c\'.')
     return ANN(W, b, c, 0.0)
 
+def random_data_with_ann(n_rows=150, n_inputs=3, n_neurons=6):
+    ann = random_ann(n_inputs, n_neurons)
+    data = np.random.random(size=(n_rows, n_inputs))
+    return data, ann.predict(data), ann
+
 class ANN:
     def __init__(self, W, b, c, beta):
         """

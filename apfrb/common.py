@@ -85,7 +85,8 @@ def foo(matrix, flc_rules):
             elif condition_2:
                 row_cond = ~np.isnan(col) & (col == 0)
             row_idx = np.where(row_cond)[0][0]
-            col_cond = ~np.isnan(col) & (col == 0)
+            val_to_keep = col[row_idx]
+            col_cond = ~np.isnan(col) & (col != val_to_keep)
             col = np.where(col_cond, np.nan, col)
             copied_matrix[:,col_idx] = col
             for idx, val in enumerate(copied_matrix[row_idx]):
