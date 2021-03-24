@@ -17,12 +17,12 @@ from multiprocessing import Pool
 try:
     from .flc import FLC
     from .rule import ElseRule
-    from .common import bar, line
+    from .common import foo, foobar, barfoo, barbar, bar, line
     from .transformation import APFRB_rule_to_FLC_rule
 except ImportError:
     from flc import FLC
     from rule import ElseRule
-    from common import bar, line
+    from common import foo, foobar, barfoo, barbar, bar, line
     from transformation import APFRB_rule_to_FLC_rule
 
 class RuleReducer:
@@ -343,57 +343,14 @@ class RuleReducer:
         return self.flc
     
     def step_5(self):
-        # NOTE: flc table becomes inconsistent after this step
-        new_table = []
-        max_length = len(self.flc.table)
-        remaining_search_space = np.matrix(deepcopy(self.flc.table))
-        while remaining_search_space.shape[0] > 2:
-            col = remaining_search_space[:,0] # get the first column of the remaining search space
-            col = np.resize(col, (len(col), ))
-            nonzero_count = np.count_nonzero(col)
-            if nonzero_count == 1:
-                # term+ occurs only once across all rules on the i'th antecedent
-                indices = np.where(col > 0)
-                new_col = np.where(col > 0, col, None)
-                new_col = list(new_col)
-                if len(new_col) < max_length:
-                    new_col.extend([None]*(max_length - len(new_col)))
-            elif nonzero_count == len(self.flc.rules) - 1:
-                # term- occurs only once across all rules on the i'th antecedent
-                indices = np.where(col != 0)
-                new_col = np.where(col > 0, None, col)
-                new_col = list(new_col)
-                new_col.extend([None]*(max_length - len(new_col)))
-                if len(new_col) < max_length:
-                    new_col.extend([None]*(max_length - len(new_col)))
-            if not isinstance(new_col, list):
-                new_col = list(new_col)
-            new_table.append(new_col)
-            
-            remaining_search_space = remaining_search_space[:(len(remaining_search_space)-1), 1:]
-        new_table.append(remaining_search_space) # TODO: add missing entries on remaining search space
-        
-        
-        return new_table
-            
-        # for i in range(self.flc.table.shape[1]): # iterate through each column
-        #     col = self.flc.table[:,i]
-        #     nonzero_count = np.count_nonzero(col)
-            
-        #     if nonzero_count == 1:
-        #         # term+ occurs only once across all rules on the i'th antecedent
-        #         indices = np.where(col > 0)
-        #         new_col = np.where(col > 0, col, None)
-        #     elif nonzero_count == len(self.flc.rules) - 1:
-        #         # term- occurs only once across all rules on the i'th antecedent
-        #         indices = np.where(col != 0)
-        #         new_col = np.where(col > 0, None, col)
-        #     else:
-        #         # no reduction possible for this antecedent
-        #         continue
-        #     new_table.append(new_col)
-        # return new_table
-            
+        ordered_table, ordered_rules = foo(self.flc.table, self.flc.rules)
+        filtered_rules = foobar(ordered_table, ordered_rules)
+        return ordered_table, filtered_rules
+    
+    def step_6(self, ordered_table, filtered_rules):
+        # TODO: need to add it so that all rules that have 
+        # the default class as the consequent are deleted as well
+        return barbar(barfoo(ordered_table, filtered_rules))
     
     def to_flc(self, Z, MULTIPROCESSING=False, PROCESSES=2):
         """
@@ -422,76 +379,39 @@ class RuleReducer:
         self.step_3(Z)
         return self.step_4()
     
-    def to_hflc(self, Z):
+    def to_hflc(self, Z, classification=False):
         if self.flc is None:
             print('This RuleReducer object does not have a saved instance of a FLC. Please run \'to_flc\' first.')
         else:
-            # step 5
-            # TODO: update this, but the below code expects 'table' to have True/False entries
-            # where the FLC object stores entries in 0's or 1's (technically any integer)
-            # for the time being, will use the APFRB's table since it is technically equivalent,
-            # but this is risky and not very robust
+            ordered_table, filtered_rules = self.step_5()
+            results = self.step_6(ordered_table, filtered_rules)
+            return results
             
-            table = np.matrix(self.apfrb.table) # TEMPORARY FIX
-            
-            self.step_5()
-            
-            return [], [], [], []
-            
-            # table = np.matrix(self.table)
-            for i in range(len(np.squeeze(np.asarray(table))[0])):
-                col = np.squeeze(np.array(table[:,i]))
-                uniqs, indices, counts = np.unique(col, return_index=True, return_counts=True)
-                argmin = np.argmin(counts)
-                argindex = indices[np.argmin(counts)]
-                if min(counts) == 1:
-                    least_occurring_term = uniqs[np.argmin(counts)]
-                    for flc_rule in self.flc.rules:
-                        # i + 1 since the count for i begins from zero, but antecedents are indexed
-                        # starting from 1 in rule base. The antecedent type of a FLC rule is stored
-                        # as a string, either "-" or "+", but is stored as a boolean in APFRB rule.
-                        # Thus, flc_rule.antecedents[i + 1].type == "+" converts the string representation
-                        # back to its boolean equivalent, and if least occurring term is True, then the
-                        # term+ linguistic term is the least occurring term.
-                        try:
-                            key = list(flc_rule.antecedents.keys())[i] # assumes the antecedents' keys are kept "in order"
-                            if flc_rule.antecedents[key].type == '+' and least_occurring_term:
-                                continue # do not delete the least occurring term from the rule
-                            else:
-                                del flc_rule.antecedents[key]
-                        except IndexError:
-                            # TODO: this likely needs to be fixed, most likely the identification of
-                            # antecedents in the fuzzy logic rules has some logic error that needs addressed
-                            print('IndexError was thrown.')
-                    # need to move the rule to the top of the rule base now (hierarchical fuzzy rule base)
-                    top_flc_rule = self.flc.rules.pop(argindex)
-                    top_flc_rule.else_clause = True
-                    self.flc.rules.insert(0, top_flc_rule)
-    
-            # step 6, classification only
-            consequent_frequency = {} # find the frequency for each rule's consequent term
-            for flc_rule in self.flc.rules:
-                try:
-                    consequent_frequency[flc_rule.consequent()] += 1
-                except KeyError:
-                    consequent_frequency[flc_rule.consequent()] = 1
-            # return the dictionary key that has the maximum value
-            # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
-            max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
-            # import operator
-            # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
-    
-            index = 0
-            while True:
-                if index < len(self.flc.rules):
-                    flc_rule = self.flc.rules[index]
-                    if flc_rule.consequent == max_freq_key:
-                        self.flc.rules.pop(index)
+            if classification:
+                # step 6, classification only
+                consequent_frequency = {} # find the frequency for each rule's consequent term
+                for flc_rule in self.flc.rules:
+                    try:
+                        consequent_frequency[flc_rule.consequent()] += 1
+                    except KeyError:
+                        consequent_frequency[flc_rule.consequent()] = 1
+                # return the dictionary key that has the maximum value
+                # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
+                max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
+                # import operator
+                # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
+        
+                index = 0
+                while True:
+                    if index < len(self.flc.rules):
+                        flc_rule = self.flc.rules[index]
+                        if flc_rule.consequent == max_freq_key:
+                            self.flc.rules.pop(index)
+                        else:
+                            index += 1
                     else:
-                        index += 1
-                else:
-                    break
-            self.flc.rules.append(ElseRule(max_freq_key))
+                        break
+                self.flc.rules.append(ElseRule(max_freq_key))
     
             # step 7
     
@@ -605,6 +525,6 @@ class RuleReducer:
     
             return self.flc.rules, intervals, equations, reduced_expressions
         
-    def simplify(self, Z, MULTIPROCESSING=False, PROCESSES=2):
+    def simplify(self, Z, classification=False, MULTIPROCESSING=False, PROCESSES=2):
         self.to_flc(Z, MULTIPROCESSING, PROCESSES)
-        return self.to_hflc(Z)
+        return self.to_hflc(Z, classification)

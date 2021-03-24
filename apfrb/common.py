@@ -159,7 +159,7 @@ def barfoo(ordered_matrices, ordered_flc_rules):
         
     return next_item
 
-def barbar(hierarchical_rule):
+def barbar(hierarchical_rule, default):
     from flc import FLC
     rule = hierarchical_rule
     while not isinstance(rule, FLC):
@@ -176,171 +176,86 @@ def barbar(hierarchical_rule):
         main_rule = main_rule.else_clause
         rule.rules.pop(idx)
         if len(rule.rules) == 1:
-            main_rule.default_class = True
+            # main_rule.default_class = True
             main_rule.ordinary_logic = True
+            main_rule.else_clause = default
             break
     return hierarchical_rule
-            
-# def foo(matrix):
-#     try:
-#         size = matrix.shape[1]
-#         if size == 1:
-#             raise IndexError
-#         matrix = matrix.astype('float32') 
-#         # for col_idx in range(size):
-#         col_idx = 0
-#         col = matrix[:,col_idx]
-#         nonzero_count = np.count_nonzero(col)
-        
-#         if nonzero_count == 1:
-#             row_cond = ~np.isnan(col) & (col != 0)
-#             row_idx = np.where(row_cond)[0][0]
-#             col_cond = ~np.isnan(col) & (col == 0)
-#             col = np.where(col_cond, np.nan, col)
-#             matrix[:,col_idx] = col
-#             for idx, val in enumerate(matrix[row_idx]):
-#                 if idx != col_idx:
-#                     matrix[row_idx, idx] = np.nan
-        
-#         elif nonzero_count == len(col) - 1:
-#             row_cond = ~np.isnan(col) & (col == 0)
-#             row_idx = np.where(row_cond)[0][0]
-#             col = np.where(row_cond, col, np.nan)
-#             matrix[:,col_idx] = col
-#             for idx, val in enumerate(matrix[row_idx]):
-#                 if idx != col_idx:
-#                     matrix[row_idx, idx] = np.nan
-        
-#         if matrix.shape[1] > 1 and (nonzero_count == 1 or nonzero_count == len(col) - 1):
-#             row = matrix[row_idx]
-#             arg = np.vstack((matrix[:row_idx], matrix[row_idx+1:]))
-#             result = foo(arg)
-#         else: # TODO: fix it so that this works when the first n columns cannot be reduced
-#             arg = matrix[1:]
-#             result = foo(arg)
-#         try:
-#             return (row, result)
-#         except UnboundLocalError:
-#             try:
-#                 return result
-#             except UnboundLocalError:
-#                 return matrix
-#     except IndexError:
-#         return matrix.astype('float32') # matrix is a single vector
 
-# def foo(matrix):
-#     free_spot = 0
-#     try:
-#         size = matrix.shape[1]
-#         if size == 1:
-#             raise IndexError
-#         matrix = matrix.astype('float32') 
-#         for col_idx in range(size):
-#             col = matrix[:,col_idx]
-#             nonzero_count = np.count_nonzero(col)
-            
-#             if nonzero_count == 1:
-#                 row_cond = ~np.isnan(col) & (col != 0)
-#                 row_idx = np.where(row_cond)[0][0]
-#                 col_cond = ~np.isnan(col) & (col == 0)
-#                 col = np.where(col_cond, np.nan, col)
-#                 matrix[:,col_idx] = col
-#                 for idx, val in enumerate(matrix[row_idx]):
-#                     if idx != col_idx:
-#                         matrix[row_idx, idx] = np.nan
-            
-#             elif nonzero_count == len(col) - 1:
-#                 row_cond = ~np.isnan(col) & (col == 0)
-#                 row_idx = np.where(row_cond)[0][0]
-#                 col = np.where(row_cond, col, np.nan)
-#                 matrix[:,col_idx] = col
-#                 for idx, val in enumerate(matrix[row_idx]):
-#                     if idx != col_idx:
-#                         matrix[row_idx, idx] = np.nan
-            
-#         return matrix
-                    
-#     except IndexError:
-#         return matrix.astype('float32') # matrix is a single vector
-
-# def foo(matrix):
-#     rows_moved_record = {'from':None, 'to':None} # keep a record of any row moved
-#     free_spot = 0
-#     try:
-#         size = matrix.shape[1]
-#         if size == 1:
-#             raise IndexError
-#         matrix = matrix.astype('float32') 
-#         # for col_idx in range(size):
-#         col_idx = 0
-#         col = matrix[:,col_idx]
-#         nonzero_count = np.count_nonzero(col)
+# def barbar(hierarchical_rule):
+#     from flc import FLC
+#     rule = hierarchical_rule
+#     while not isinstance(rule, FLC):
+#         rule.ordinary_logic = True
+#         rule = rule.else_clause
         
-#         if nonzero_count == 1:
-#             row_cond = ~np.isnan(col) & (col != 0)
-#             row_idx = np.where(row_cond)[0][0]
-#             col_cond = ~np.isnan(col) & (col == 0)
-#             col = np.where(col_cond, np.nan, col)
-#             matrix[:,col_idx] = col
-#             for idx, val in enumerate(matrix[row_idx]):
-#                 if idx != col_idx:
-#                     matrix[row_idx, idx] = np.nan
-#             # the rule must be made to be the first rule on the top
-#             temp = matrix.tolist()
-#             row_to_be_added = temp[row_idx]
-#             temp.pop(row_idx)
-#             temp.insert(free_spot, row_to_be_added)
-#             rows_moved_record['to'] = free_spot
-#             rows_moved_record['from'] = row_idx
-#             free_spot += 1
-#             matrix = np.array(temp)
-        
-#         elif nonzero_count == len(col) - 1:
-#             row_cond = ~np.isnan(col) & (col == 0)
-#             row_idx = np.where(row_cond)[0][0]
-#             col = np.where(row_cond, col, np.nan)
-#             matrix[:,col_idx] = col
-#             for idx, val in enumerate(matrix[row_idx]):
-#                 if idx != col_idx:
-#                     matrix[row_idx, idx] = np.nan
-#             # the rule must be made to be the first rule on the top
-#             temp = matrix.tolist()
-#             row_to_be_added = temp[row_idx]
-#             temp.pop(row_idx)
-#             temp.insert(free_spot, row_to_be_added)
-#             rows_moved_record['to'] = free_spot
-#             rows_moved_record['from'] = row_idx
-#             free_spot += 1
-#             matrix = np.array(temp)
-        
-#         if matrix.shape[1] > 1:
-#             arg = matrix[1:, 1:]
-#             # col_to_be_added_back = matrix[:, 0]
-#             row_to_be_added_back = matrix[0, 1:]
-#             matrix = matrix[:,:1]
-#             result, move_record = foo(arg)
-            
-#             if move_record['to'] is not None and move_record['from'] is not None:
-#                 temp = matrix.tolist()
-                
-            
-#             num_cols_to_be_padded = result.shape[1]
-#             # padding = np.array([np.nan]*num_cols_to_be_padded).reshape((1, num_cols_to_be_padded))
-#             result = np.vstack((row_to_be_added_back, result))
-#             matrix = np.hstack((matrix, result))
-#         return matrix, rows_moved_record
-                
-#     except IndexError:
-#         return matrix.astype('float32') # matrix is a single vector
+#     main_rule = rule.rules[0]
+#     idx = 1
+#     while True:
+#         flc_rule = rule.rules[idx]
+#         flc_rule.ordinary_logic = True
+#         main_rule.else_clause = flc_rule
+#         main_rule.ordinary_logic = True
+#         main_rule = main_rule.else_clause
+#         rule.rules.pop(idx)
+#         if len(rule.rules) == 1:
+#             main_rule.default_class = True
+#             main_rule.ordinary_logic = True
+#             break
+#     return hierarchical_rule
 
-# inpt = np.array([[1, 0, 1], [0, 0, 1], [1, 1, 0], [1, 0, 0]])
+def default_consequent(ordered_table, filtered_rules):
+    from flc import FLC
+    from rule import FLC_Rule
+    consequent_frequency = {} # find the frequency for each rule's consequent term
+    for item in filtered_rules:
+        if isinstance(item, FLC_Rule):
+            consequent = item.consequent()
+            if consequent in consequent_frequency:
+                consequent_frequency[consequent] += 1
+            else:
+                consequent_frequency[consequent] = 1
+        elif isinstance(item, list):
+            for flc_rule in item:
+                consequent = flc_rule.consequent()
+                if consequent in consequent_frequency:
+                    consequent_frequency[consequent] += 1
+                else:
+                    consequent_frequency[consequent] = 1
+        else:
+            raise Exception('Invalid input. Something went wrong.')
+    # return the dictionary key that has the maximum value
+    # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
+    return max(consequent_frequency, key=lambda k: consequent_frequency[k])
 
-# results1 = foo(inpt)
+def delete_rules_with_default_consequent(ordered_table, filtered_rules):
+    from rule import FLC_Rule
+    default = default_consequent(ordered_table, filtered_rules)
+    indices_to_delete = []
+    for idx, item in enumerate(filtered_rules):
+        if isinstance(item, FLC_Rule):
+            if item.consequent() == default:
+                indices_to_delete.append(idx)
+        elif isinstance(item, list):
+            for jdx, flc_rule in enumerate(item):
+                if flc_rule.consequent() == default:
+                    indices_to_delete.append((idx, jdx))
+        else:
+            raise Exception('Invalid input. Something went wrong.')
+    
+    # delete all identified ruless
+    indices_to_delete.reverse() # reverse the list to not affect the indices that are to be deleted as the elements are removed from the list
+    for index in indices_to_delete:
+        if isinstance(index, int):
+            ordered_table.pop(index)
+            filtered_rules.pop(index)
+        elif isinstance(index, tuple):
+            ordered_table[index[0]].pop(index[1])
+            filtered_rules[index[0]].pop(index[1])
+        else:
+            raise Exception('Invalid input. Something went wrong.')
+    return ordered_table, filtered_rules, default
 
-# test = np.array([[1, 0], [1, 1], [0, 0]])
-
-# ressults2 = foo(test)
-        
 def plot(title, x_lbl, y_lbl):
     """
     Handles the basic mechanics of plotting a graph

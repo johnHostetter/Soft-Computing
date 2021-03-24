@@ -117,18 +117,23 @@ def iris_example():
     ruleReducer = RuleReducer(apfrb)
     flc = ruleReducer.to_flc(Z, True)
         
-    # rules, intervals, equations, reduced = ruleReducer.simplify(Z, MULTIPROCESSING=False)
+    # return ruleReducer.simplify(Z, True, MULTIPROCESSING=False)
     
     from common import foo, foobar
     
     ordered_table, ordered_rules = foo(flc.table, flc.rules)
     
     filtered_rules = foobar(ordered_table, ordered_rules)
-    rules = filtered_rules
     
-    from common import barfoo
+    from common import delete_rules_with_default_consequent
     
-    result = barfoo(ordered_table, rules)
+    ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
+    
+    from common import barfoo, barbar
+    
+    result = barbar(barfoo(ordered_table, filtered_rules), default)
+    
+    return result
     
     # z = Z[0]
     # y = []
@@ -139,7 +144,7 @@ def iris_example():
     # end = time.time()
     # print('%s seconds' % (end-start))
     # print(flc)
-    return apfrb, ann, rules, ordered_table, ruleReducer, result
+    # return result
 
 def random_example():
     Z, labels, ann = random_data_with_ann(150, 4, 5)
@@ -182,14 +187,14 @@ if __name__ == '__main__':
     #    [1, 1, 1, 1, 1]])
     # rls = list(range(table.shape[0]))
     # res = foo(table, rls)
-    apfrb, flc, reducer = random_example()
-    ordered_table, ordered_rules = foo(flc.table, flc.rules)
-    filtered_rules = foobar(ordered_table, ordered_rules)
+    # apfrb, flc, reducer = random_example()
+    # ordered_table, ordered_rules = foo(flc.table, flc.rules)
+    # filtered_rules = foobar(ordered_table, ordered_rules)
     
-    from common import barfoo
+    # from common import barfoo
     
-    result = barfoo(ordered_table, filtered_rules)
-    # apfrb, ann, rules, tables, reducer, result = iris_example()
+    # result = barfoo(ordered_table, filtered_rules)
+    result = iris_example()
     # from common import barbar
     # res = barbar(result)
     # # import some data to play with
