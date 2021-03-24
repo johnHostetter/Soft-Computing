@@ -147,6 +147,8 @@ def barfoo(ordered_matrices, ordered_flc_rules):
         next_item = copied_flc_rules[next_idx]
         if isinstance(next_item, list):
             else_clause = FLC(next_item, next_table)
+            if len(ordered_flc_rules) == 1: # the fuzzy logic controller is the only entry 
+                return else_clause
         elif isinstance(next_item, FLC_Rule):
             next_item.else_clause = else_clause
             else_clause = next_item
