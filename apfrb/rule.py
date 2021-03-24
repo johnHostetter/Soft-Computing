@@ -31,19 +31,6 @@ class LogisticTerm:
     def mu(self, x):
         return self.__logistic(x, self.k, self.type)
 
-class ElseRule:
-    def __init__(self, consequents):
-        self.consequents = consequents
-    
-    def __str__(self):
-        return 'ELSE %s' % self.consequent()
-    
-    def consequent(self):
-        if isinstance(self.consequents, float):
-            return self.consequents
-        else:
-            raise Exception('FLC rule consequent is not a float.')
-
 class FLC_Rule:
     def __init__(self, antecedents, consequents, else_clause=None):
         self.antecedents = antecedents

@@ -10,7 +10,7 @@ import unittest
 import numpy as np
 
 from apfrb.common import logistic
-from apfrb.rule import LogisticTerm, ElseRule
+from apfrb.rule import LogisticTerm
 
 class test_LogisticTerm(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -39,19 +39,6 @@ class test_LogisticTerm(unittest.TestCase):
         self.assertEqual(self.pos_term.mu(self.x), mu)
         mu = logistic(self.x, self.k, self.neg)
         self.assertEqual(self.neg_term.mu(self.x), mu)
-
-class test_ElseRule(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(test_ElseRule, self).__init__(*args, **kwargs)
-        self.consequent = 'Iris flower class is Virginica'
-        self.else_rule = ElseRule(self.consequent)
-
-    def test_ElseRule_str(self):
-        """
-        Test that the string of an Else Rule is successfully created.
-        """
-        self.assertEqual(self.consequent, self.else_rule.consequent)
-        self.assertEqual('ELSE %s' % self.consequent, str(self.else_rule))
 
 if __name__ == '__main__':
     unittest.main()

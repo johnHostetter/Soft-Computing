@@ -16,12 +16,10 @@ from multiprocessing import Pool
 
 try:
     from .flc import FLC
-    from .rule import ElseRule
     from .common import foo, foobar, barfoo, barbar, bar, line
     from .transformation import APFRB_rule_to_FLC_rule
 except ImportError:
     from flc import FLC
-    from rule import ElseRule
     from common import foo, foobar, barfoo, barbar, bar, line
     from transformation import APFRB_rule_to_FLC_rule
 
@@ -386,32 +384,6 @@ class RuleReducer:
             ordered_table, filtered_rules = self.step_5()
             results = self.step_6(ordered_table, filtered_rules)
             return results
-            
-            if classification:
-                # step 6, classification only
-                consequent_frequency = {} # find the frequency for each rule's consequent term
-                for flc_rule in self.flc.rules:
-                    try:
-                        consequent_frequency[flc_rule.consequent()] += 1
-                    except KeyError:
-                        consequent_frequency[flc_rule.consequent()] = 1
-                # return the dictionary key that has the maximum value
-                # WARNING: will only return 1 of many matches (if there is a tie), however, this is okay for this purpose
-                max_freq_key = max(consequent_frequency, key=lambda k: consequent_frequency[k])
-                # import operator
-                # max_freq_key = max(consequent_frequency.iteritems(), key=operator.itemgetter(1))[0]
-        
-                index = 0
-                while True:
-                    if index < len(self.flc.rules):
-                        flc_rule = self.flc.rules[index]
-                        if flc_rule.consequent == max_freq_key:
-                            self.flc.rules.pop(index)
-                        else:
-                            index += 1
-                    else:
-                        break
-                self.flc.rules.append(ElseRule(max_freq_key))
     
             # step 7
     
