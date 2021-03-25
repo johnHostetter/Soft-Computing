@@ -7,7 +7,10 @@ Created on Sun Feb 21 21:51:30 2021
 """
 
 import numpy as np
-from sympy import Symbol
+from sympy import Symbol, N # N is used to evaluate floating point approximations
+from copy import deepcopy
+
+from sklearn import datasets
 
 try:
     from .flc import FLC
@@ -17,7 +20,7 @@ except ImportError:
     from common import subs, logistic
     
 class OrdinaryTerm:
-    def __init__(self, sympy_expr_interval, z_i):
+    def __init__(self, sympy_expr_interval, z_i, precision=4):
         """
         z_i is the raw data index that the sympy expression interval is conditioned on
 
@@ -35,9 +38,10 @@ class OrdinaryTerm:
         """
         self.sympy_expr_interval = sympy_expr_interval
         self.z_i = z_i
+        self.precision = precision
         
     def __str__(self):
-        return str(self.sympy_expr_interval)
+        return str(N(self.sympy_expr_interval, self.precision))
     
     def mu(self, x):
         """
@@ -53,11 +57,12 @@ class OrdinaryTerm:
         None.
 
         """
-        arg = 'z[%s]' % self.z_i
-        if self.sympy_expr_interval.subs(Symbol(arg), x):
-            return 1.0
-        else:
-            return 0.0
+        expr = deepcopy(self.sympy_expr_interval)
+        for i, z_i in enumerate(self.z_i):
+            arg = 'z[%s]' % z_i
+            expr = expr.subs(Symbol(arg), x[int(z_i)])
+            
+        return 1.0 if expr else 0.0
 
 class LogisticTerm:
     def __init__(self, k, neg_or_pos):
@@ -149,7 +154,10 @@ class FLC_Rule:
         else:
             degree = 1.0
             for key in self.antecedents.keys():
-                degree *= self.antecedents[key].mu(x[key])
+                if isinstance(self.antecedents[key], OrdinaryTerm):
+                    degree *= self.antecedents[key].mu(list(x.values()))
+                else:
+                    degree *= self.antecedents[key].mu(x[key])
             self.memo[key] = degree
             return self.__crisp_logic(x, degree)
 

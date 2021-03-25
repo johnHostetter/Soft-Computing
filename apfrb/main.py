@@ -150,7 +150,7 @@ def iris_example():
     # return result
 
 def random_example():
-    Z, labels, ann = random_data_with_ann(150, 4, 7)
+    Z, labels, ann = random_data_with_ann(150, 4, 6)
     
     apfrb = T(ann)
     
@@ -173,13 +173,33 @@ def random_example():
     line(range(len(vals)), vals, 'flc', '', '')
     line(range(len(vals)), sorted(vals), 'sorted flc', '', '')
     
-    return apfrb, flc, ruleReducer
+    return apfrb, flc, ruleReducer, Z
         
 def pyrenees():
     ann = pyrenees_ann()
     apfrb = T(ann)
     print(apfrb)
     return apfrb
+
+def hardcoded_iris_soln():
+    # import some data to play with
+    iris = datasets.load_iris()
+    labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
+    Z = iris.data[:, :4]  # we only take the first four features.
+    # Z = np.flip(Z, axis = 1)
+    y_pred = []
+    
+    for idx, z in enumerate(Z):
+        if -12*z[3]+53.1*z[2]-16.8*z[1]+7.2*z[0] + 3.1 < 9:
+        # if z[2] < 2.75:
+            y_pred.append(1)
+        elif 360*z[3]+885*z[2]-160.8*z[1]-158.48*z[0] - 158.2 < 518:
+        # elif z[2] + z[3] < 6.53:
+            y_pred.append(-1)
+        else:
+            y_pred.append(0)
+        
+    print(np.count_nonzero(np.array(y_pred)==labels)/150)
 
 if __name__ == '__main__':
     # table = np.array([[0, 1, 1, 1, 1],
@@ -207,8 +227,14 @@ if __name__ == '__main__':
     hflc_pred = []
     
     for idx, z in enumerate(Z):
+        # y = []
+        # for j in range(ann.m):
+        #     y.append(np.dot(ann.W[j].T, z))
+        # x = dict(zip(range(1, len(y) + 1), y))
         x = dict(zip(range(1, len(z) + 1), z))
         hflc_pred.append(result.t(x))
+        
+    print(np.count_nonzero(np.array(hflc_pred)==labels)/150)
     
     # for idx, z in enumerate(Z):
     #     y = []

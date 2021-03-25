@@ -385,6 +385,8 @@ class RuleReducer:
         else:
             ordered_table, filtered_rules, default = self.step_5()
             results = self.step_6(ordered_table, filtered_rules, default)
+            
+            # return results
     
             # step 7
     
@@ -435,28 +437,41 @@ class RuleReducer:
             parsed_expressions = []
             reduced_expressions = []
             for equation in equations:
-    #            parsed_expressions.append(sp.parse_expr(equation)) # this also works
                 parsed_expressions.append(sp.sympify(equation))
     
                 # get the coefficients from the equation, ignore the last coefficient in the list returned,
                 # it is the constant that is not being multiplied by any normalized z_i
                 coefficients = sp.Poly(equation).coeffs()
-                # coefficients = sp.Poly(sp.sympify(equation)).coeffs() # this also works
                 coefficients = coefficients[:-1] # ignoring the last coefficient since it is not multiplied by any symbol
-                max_coeff = max(coefficients, key=abs) # get the largest coefficient and keep it
-                z_idx = coefficients.index(max_coeff) + 1 # since the z_i count from 1 to n, we add plus 1
-    
-                # # create reduced expression
-                # reduced_expression = ''
-                # reduced_expression += ('%s' % max_coeff)
-                # reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
-                # reduced_expressions.append(reduced_expression)
+                
+                # round the coefficients to avoid precision error when looking up values
+                
+                coefficients = [round(num, 8) for num in coefficients]
+                
+                threshold = 0.7 # the combined inputs have to contribute to 80% of the activation
+                large_coeffs = []
+                large_coeffs_indices = []
+                
+                copied_coefficients = deepcopy(coefficients)
+                
+                while True:
+                    max_coeff = max(copied_coefficients, key=abs) # get the largest coefficient and keep it
+                    z_idx = coefficients.index(max_coeff) + 1 # since the z_i count from 1 to n, we add plus 1
+                    large_coeffs.append(max_coeff)
+                    large_coeffs_indices.append(z_idx)
+                    copied_coefficients.remove(max_coeff)
+                    if sum(abs(np.array(large_coeffs))) / sum(abs(np.array(coefficients))) >= threshold:
+                        break
+                    else:
+                        continue
     
                 # obtain remainder of expression
                 removed_part_of_expression = sp.sympify(equation)
-                arg = 'z[%s]' % (z_idx - 1)
-                # substitute the non-important weights/terms with zero
-                removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
+                
+                for z_idx in large_coeffs_indices:
+                    arg = 'z[%s]' % (z_idx - 1)
+                    # substitute the non-important weights/terms with zero
+                    removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
     
                 print(sp.sympify(removed_part_of_expression))
     
@@ -475,14 +490,27 @@ class RuleReducer:
     
                 # create reduced expression
                 reduced_expression = ''
-                reduced_expression += ('%s' % max_coeff)
-                reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+                for idx, large_coeff in enumerate(large_coeffs):
+                    z_idx = large_coeffs_indices[idx]
+                    corresponding_interval_for_z = intervals[z_idx - 1]
+                    minimum = corresponding_interval_for_z[0]
+                    maximum = corresponding_interval_for_z[1]
+                    norm_z = ('*((Symbol("z[%s]")' % (z_idx - 1))
+                    norm_z += ' - %s)' % minimum
+                    norm_z += (' / (%s - %s))' % (maximum, minimum))
+                    reduced_expression += ('%s' % large_coeff)
+                    reduced_expression += norm_z
+                    # reduced_expression += ('*Symbol("z[%s]")' % (z_idx - 1))
+                    if idx < len(large_coeffs) - 1:
+                        reduced_expression += ' + '
+                        
                 reduced_expression += ('+%s' % summation)
                 reduced_expressions.append(reduced_expression)
             
             # NEW CODE
             
             # go through each rule's antecedents, and substitute its antecedents with original attributes
+            import re
             from rule import FLC_Rule
             from rule import OrdinaryTerm
             new_results = deepcopy(results)
@@ -499,9 +527,16 @@ class RuleReducer:
                             copied_current_expression += ' < '
                         else:
                             raise Exception('Invalid input. Something went wrong.')
+                        
                         copied_current_expression += str(term.k)
                         sympy_simplified_expr = sp.simplify(sp.sympify(copied_current_expression))
-                        current_rule.antecedents[key] = OrdinaryTerm(sympy_simplified_expr, key - 1)
+                        sympy_simplified_expr = sp.factor(sp.N(sympy_simplified_expr, 8))
+                        # current_rule.antecedents[key] = OrdinaryTerm(sympy_simplified_expr, key - 1) # use this for when only one large coeff is to be kept
+                        
+                        # current_rule.antecedents[key] = OrdinaryTerm(sympy_simplified_expr, [val - 1 for val in large_coeffs_indices]) # use this for when more than one large coeff is to be kept
+                        regex = r"\[\s*\+?(-?\d+)\s*\]" # regex to extract integer from in-between square brackets
+                        indices = re.findall(regex, str(list(sympy_simplified_expr.free_symbols)))
+                        current_rule.antecedents[key] = OrdinaryTerm(sympy_simplified_expr, indices)
 
                     current_rule = current_rule.else_clause
                     
@@ -511,24 +546,6 @@ class RuleReducer:
                     else:
                         break
             return new_results
-    
-                # for i in range(n):
-                #     if i == (z_idx - 1):
-                #         # create reduced expression
-                #         reduced_expression = ''
-                #         reduced_expression += ('%s' % max_coeff)
-                #         reduced_expression += ('*Symbol("z[%s]")' % i)
-                #         reduced_expressions.append(reduced_expression)
-                #     else:
-                #         # obtain remainder of expression
-                #         removed_part_of_expression = deepcopy(sp.parse_expr(equation))
-                #         arg = 'z[%s]' % i
-                #         # substitute the non-important weights/terms with zero
-                #         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
-    
-                # print(sp.sympify(removed_part_of_expression))
-            return results
-            # return self.flc.rules, intervals, equations, reduced_expressions
         
     def simplify(self, Z, classification=False, MULTIPROCESSING=False, PROCESSES=2):
         self.to_flc(Z, MULTIPROCESSING, PROCESSES)
