@@ -91,7 +91,7 @@ def infer(flc, ann, Z, i):
 
 def pyrenees_ann():
     from tensorflow.keras.models import load_model
-    model = load_model('test_model_classification.h5')
+    model = load_model('model_w_6_neurons.h5')
     return ANN(model.trainable_weights[0].numpy().T, model.trainable_weights[1].numpy().T, 
               model.trainable_weights[2].numpy().T[0], model.trainable_weights[3].numpy()[0])
 
@@ -150,7 +150,7 @@ def iris_example():
     # return result
 
 def random_example():
-    Z, labels, ann = random_data_with_ann(150, 4, 6)
+    Z, labels, ann = random_data_with_ann(150, 8, 3, seed=1)
     
     apfrb = T(ann)
     
@@ -217,24 +217,106 @@ if __name__ == '__main__':
     # from common import barfoo
     
     # result = barfoo(ordered_table, filtered_rules)
-    ann, apfrb, flc, result = iris_example()
-
-    # import some data to play with
-    iris = datasets.load_iris()
-    labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
-    Z = iris.data[:, :4]  # we only take the first four features.
-    Z = np.flip(Z, axis = 1)
-    hflc_pred = []
     
-    for idx, z in enumerate(Z):
-        # y = []
-        # for j in range(ann.m):
-        #     y.append(np.dot(ann.W[j].T, z))
-        # x = dict(zip(range(1, len(y) + 1), y))
-        x = dict(zip(range(1, len(z) + 1), z))
-        hflc_pred.append(result.t(x))
+    
+    
+    
+    # PYRENEES EXAMPLE CODE
+    
+    
+    if True:
+        ann = pyrenees_ann()
+        apfrb = T(ann)
+        reducer = RuleReducer(apfrb)
         
-    print(np.count_nonzero(np.array(hflc_pred)==labels)/150)
+        import pandas as pd
+        from common import PROBLEM_FEATURES
+        
+        raw_data = pd.read_csv('labeled_critical_train_data.csv')
+        df = raw_data.iloc[:6000]
+        filt_df = df[PROBLEM_FEATURES]
+        Z = filt_df.values
+        labels = df['label'].values
+        
+        flc = reducer.to_flc(Z, MULTIPROCESSING=True)
+        
+        y_pred = []
+        for idx, z in enumerate(Z):
+            y = []
+            for j in range(ann.m):
+                y.append(np.dot(ann.W[j].T, z))
+            x = dict(zip(range(1, len(y) + 1), y))
+            y_pred.append(flc.infer_with_u_and_d(x))
+        
+        print('accuracy w.r.t. student = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred)) == np.round(ann.predict(Z)))/len(Z)))
+        print('accuracy w.r.t. teacher = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred) + 1) == labels)/len(Z)))
+    
+        if False:    
+            hflc = reducer.to_hflc(Z, classification=True)
+            
+            # TEMPORARY ERROR - need to fix, until then remove the crisp rule
+            crisp_rule = hflc.rules.pop(0)
+            
+            y_pred = []
+            for i, z in enumerate(Z):
+                y = []
+                for j in range(ann.m):
+                    y.append(np.dot(ann.W[j].T, z))
+                x = dict(zip(range(1, len(y) + 1), y))
+                y_pred.append(hflc.infer_with_u_and_d(x))
+            
+            print('accuracy w.r.t. student = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred)) == np.round(ann.predict(Z)))/len(Z)))
+            print('accuracy w.r.t. teacher = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred) + 1) == labels)/len(Z)))
+
+    
+
+
+    # END OF PYRENEES EXAMPLE CODE
+
+
+
+
+    
+    # apfrb, flc, reducer, Z = random_example()
+    # result = reducer.to_hflc(Z, False)
+    # print('\n\n\nRule Base:')
+    # print('-'*100)
+    # print()
+    # print(result)
+    
+    
+    
+    
+    
+    
+    # BELOW IS TEST
+    
+    if False:
+        ann, apfrb, flc, result = iris_example()
+    
+        # import some data to play with
+        iris = datasets.load_iris()
+        labels = np.array([iris_labels(label) for label in iris.target]) # target values that match APFRB paper
+        Z = iris.data[:, :4]  # we only take the first four features.
+        Z = np.flip(Z, axis = 1)
+        hflc_pred = []
+        
+        for idx, z in enumerate(Z):
+            # y = []
+            # for j in range(ann.m):
+            #     y.append(np.dot(ann.W[j].T, z))
+            # x = dict(zip(range(1, len(y) + 1), y))
+            x = dict(zip(range(1, len(z) + 1), z))
+            hflc_pred.append(result.t(x))
+            
+        print(np.count_nonzero(np.array(hflc_pred)==labels)/150)
+    
+    
+    # END OF TEST
+    
+    
+    
+    
     
     # for idx, z in enumerate(Z):
     #     y = []

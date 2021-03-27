@@ -73,9 +73,9 @@ class LogisticTerm:
         
     def __str__(self):
         if self.type == "+":
-            return ("larger than %s" % self.k)
+            return ("larger than %.2f" % self.k)
         else:
-            return ("smaller than %s" % self.k)
+            return ("smaller than %.2f" % self.k)
         
     def mu(self, x):
         return self.__logistic(x, self.k, self.type)
@@ -103,7 +103,7 @@ class FLC_Rule:
             if iterations < limit - 1:
                 output += ' AND'
             iterations += 1
-        temp = (' THEN f(x) = %s' % self.consequent())
+        temp = (' THEN f(x) = %.2f' % self.consequent())
         output += temp
         if self.else_clause is not None:
             output += ' ELSE;'

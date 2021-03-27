@@ -343,14 +343,18 @@ class RuleReducer:
     def step_5(self):
         ordered_table, ordered_rules = foo(self.flc.table, self.flc.rules)
         filtered_rules = foobar(ordered_table, ordered_rules)
-        from common import delete_rules_with_default_consequent
-        ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
-        return ordered_table, filtered_rules, default
+        return ordered_table, filtered_rules
     
-    def step_6(self, ordered_table, filtered_rules, default):
+    def step_6(self, ordered_table, filtered_rules, classification=False):
         # TODO: need to add it so that all rules that have 
         # the default class as the consequent are deleted as well
-        return barbar(barfoo(ordered_table, filtered_rules), default)
+        if classification:
+            from common import delete_rules_with_default_consequent
+            ordered_table, filtered_rules, default = delete_rules_with_default_consequent(ordered_table, filtered_rules)
+        results = barfoo(ordered_table, filtered_rules)
+        if classification:
+            results = barbar(results, default)
+        return results
     
     def to_flc(self, Z, MULTIPROCESSING=False, PROCESSES=2):
         """
@@ -383,8 +387,8 @@ class RuleReducer:
         if self.flc is None:
             print('This RuleReducer object does not have a saved instance of a FLC. Please run \'to_flc\' first.')
         else:
-            ordered_table, filtered_rules, default = self.step_5()
-            results = self.step_6(ordered_table, filtered_rules, default)
+            ordered_table, filtered_rules = self.step_5()
+            results = self.step_6(ordered_table, filtered_rules, classification)
             
             # return results
     
@@ -436,7 +440,10 @@ class RuleReducer:
                     
             parsed_expressions = []
             reduced_expressions = []
-            for equation in equations:
+            for equation_idx, equation in enumerate(equations):
+                
+                print('Equation %s:' % (equation_idx + 1))
+                
                 parsed_expressions.append(sp.sympify(equation))
     
                 # get the coefficients from the equation, ignore the last coefficient in the list returned,
@@ -448,7 +455,7 @@ class RuleReducer:
                 
                 coefficients = [round(num, 8) for num in coefficients]
                 
-                threshold = 0.7 # the combined inputs have to contribute to 80% of the activation
+                threshold = 0.7 # the combined inputs have to contribute to 70% of the activation
                 large_coeffs = []
                 large_coeffs_indices = []
                 
@@ -474,6 +481,8 @@ class RuleReducer:
                     removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), 0)
     
                 print(sp.sympify(removed_part_of_expression))
+                
+                print('Iterating through the data and each individual feature to remove it wherever possible...')
     
                 summation = 0.0
                 for observation in Z:
@@ -487,6 +496,8 @@ class RuleReducer:
                         removed_part_of_expression = removed_part_of_expression.subs(Symbol(arg), norm_z_i)
                     summation += float(removed_part_of_expression)
                 summation /= len(Z)
+                
+                print('Creating the reduced expressions for the rule antecedents...')
     
                 # create reduced expression
                 reduced_expression = ''
@@ -508,6 +519,8 @@ class RuleReducer:
                 reduced_expressions.append(reduced_expression)
             
             # NEW CODE
+            
+            print('\nConverting from fuzzy logic rules to ordinary logic rules (this may take a significant amount of time)...')
             
             # go through each rule's antecedents, and substitute its antecedents with original attributes
             import re
