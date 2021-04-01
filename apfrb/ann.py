@@ -7,6 +7,7 @@ Created on Wed Mar 17 16:48:59 2021
 """
 
 import numpy as np
+from numpy import savetxt
 
 def random_ann(n_inputs=3, n_neurons=6):
     """
@@ -142,3 +143,9 @@ class ANN:
         """
         results = np.array([self.forward(z) for z in Z])
         return results if func is None else list(map(func, results))
+    
+    def export(self):
+        savetxt('./flc/ann_W.csv', self.W, delimiter=',')
+        savetxt('./flc/ann_b.csv', self.b, delimiter=',')
+        savetxt('./flc/ann_c.csv', self.c, delimiter=',')
+        savetxt('./flc/ann_beta.csv', np.array([self.beta]), delimiter=',')

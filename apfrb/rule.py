@@ -71,6 +71,12 @@ class LogisticTerm:
         self.__logistic = logistic
         self.memo = {}
         
+    def __hash__(self):
+        if self.type == '+':
+            return hash(self.k)
+        else:
+            return hash(-self.k)
+        
     def __str__(self):
         if self.type == "+":
             return ("larger than %.2f" % self.k)
@@ -79,6 +85,9 @@ class LogisticTerm:
         
     def mu(self, x):
         return self.__logistic(x, self.k, self.type)
+    
+    def export(self):
+        return {'id':hash(self), 'k':self.k, 'type':self.type}
 
 class FLC_Rule:
     def __init__(self, antecedents, consequents, else_clause=None):
@@ -160,6 +169,14 @@ class FLC_Rule:
                     degree *= self.antecedents[key].mu(x[key])
             self.memo[key] = degree
             return self.__crisp_logic(x, degree)
+    
+    def export(self):
+        rule = {}
+        for key in self.antecedents.keys():
+            col_name = '{}'.format(key)
+            rule[col_name] = hash(self.antecedents[key])
+        rule['consequent'] = self.consequent()
+        return rule
 
 class APFRB_Rule:
     def __init__(self, antecedents, consequents, lookup, W, v):

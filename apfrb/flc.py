@@ -7,6 +7,7 @@ Created on Wed Mar 17 20:25:46 2021
 """
 
 import numpy as np
+import pandas as pd
 
 class FLC:
     def __init__(self, rules, table):
@@ -123,3 +124,33 @@ class FLC:
             prediction = func(f)
             predictions.append(prediction)
         return np.array(predictions)
+    
+    def export_terms(self, to_csv=False, filename='./flc/terms.csv'): # if to_csv is not False, provide file name
+        terms = []
+        n_columns = self.table.shape[1]
+        for col_idx in range(n_columns):
+            for term_idx in [0, 1]:
+                rule_index = np.where(self.table[:,col_idx]==term_idx)[0][0] # get the first one, doesn't matter
+                rule = self.rules[rule_index]
+                antecedent_index = list(rule.antecedents.keys())[col_idx]
+                terms.append(rule.antecedents[antecedent_index].export())
+        df = pd.DataFrame(terms)
+        if to_csv:
+            df.to_csv(filename, index=False)
+            print('FLC terms successfully saved.')
+        return df
+    
+    def export_rules(self, to_csv=False, filename='./flc/rules.csv'): # if to_csv is not False, provide file name
+        rules = []
+        for rule in self.rules:
+            rules.append(rule.export())
+        df = pd.DataFrame(rules)
+        if to_csv:
+            df.to_csv(filename, index=False)
+            print('FLC rules successfully saved.')
+        return df
+    
+    def export(self, to_csv=False):
+        terms_df = self.export_terms(to_csv)
+        rules_df = self.export_rules(to_csv)
+        return terms_df, rules_df

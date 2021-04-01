@@ -233,12 +233,12 @@ if __name__ == '__main__':
         from common import PROBLEM_FEATURES
         
         raw_data = pd.read_csv('labeled_critical_train_data.csv')
-        df = raw_data.iloc[:6000]
+        df = raw_data.iloc[:300]
         filt_df = df[PROBLEM_FEATURES]
         Z = filt_df.values
         labels = df['label'].values
         
-        flc = reducer.to_flc(Z, MULTIPROCESSING=True)
+        flc = reducer.to_flc(Z, MULTIPROCESSING=False)
         
         y_pred = []
         for idx, z in enumerate(Z):
@@ -251,7 +251,7 @@ if __name__ == '__main__':
         print('accuracy w.r.t. student = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred)) == np.round(ann.predict(Z)))/len(Z)))
         print('accuracy w.r.t. teacher = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred) + 1) == labels)/len(Z)))
     
-        if False:    
+        if False: # enable this AFTER the study, these steps take too long and aren't needed yet
             hflc = reducer.to_hflc(Z, classification=True)
             
             # TEMPORARY ERROR - need to fix, until then remove the crisp rule
