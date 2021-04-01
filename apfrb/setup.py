@@ -57,20 +57,31 @@ def pyrenees_classification(f):
     return -1 if f < -0.5 else 1 if 0.5 < f else 0
 
 class Model:
-    def __init__(self, flc, ann, func):
+    def __init__(self, flc, ann, func, min_vector, max_vector):
         self.flc = flc
         self.ann = ann
         self.func = func
+        self.min_vector = min_vector
+        self.max_vector = max_vector
         
-    def predict(self, z):
+    def predict(self, z, normalized=False):
         # z will be unnormalized, raw data observation
         # meant for true integration with Pyrenees
-        raw_pred = self.flc.predict_with_ann([z], self.ann, self.func)
+        if not normalized:
+            norm_z = (z - self.min_vector) / (self.max_vector - self.min_vector)
+        else:
+            norm_z = z
+        raw_pred = self.flc.predict_with_ann([norm_z], self.ann, self.func)
         processed_pred = int(raw_pred + 1) # plus 1, since the range is {-1, 0, +1}
         return processed_pred
 
 def load_model():
     flc = load_flc()
     ann = load_ann()
-    model = Model(flc, ann, pyrenees_classification)
+    problem_id = 'problem'
+    normalization_vector_path = './pyrenees/normalization_values/normalization_features_all_{}.csv'.format(problem_id)
+    df = pd.read_csv(normalization_vector_path)
+    min_vector = df.min_val.values.astype(np.float64)
+    max_vector = df.max_val.values.astype(np.float64)
+    model = Model(flc, ann, pyrenees_classification, min_vector, max_vector)
     return model
