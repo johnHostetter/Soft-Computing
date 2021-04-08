@@ -144,8 +144,9 @@ class ANN:
         results = np.array([self.forward(z) for z in Z])
         return results if func is None else list(map(func, results))
     
-    def export(self):
-        savetxt('./flc/ann_W.csv', self.W, delimiter=',')
-        savetxt('./flc/ann_b.csv', self.b, delimiter=',')
-        savetxt('./flc/ann_c.csv', self.c, delimiter=',')
-        savetxt('./flc/ann_beta.csv', np.array([self.beta]), delimiter=',')
+    def export(self, folder='./flc/'):
+        filepath = './' + folder + '/' 
+        savetxt(filepath + 'ann_W.csv', self.W, delimiter=',')
+        savetxt(filepath + 'ann_b.csv', self.b, delimiter=',')
+        savetxt(filepath + 'ann_c.csv', self.c, delimiter=',')
+        savetxt(filepath + 'ann_beta.csv', np.array([self.beta]), delimiter=',')

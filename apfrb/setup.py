@@ -71,7 +71,7 @@ class Model:
             norm_z = (z - self.min_vector) / (self.max_vector - self.min_vector)
         else:
             norm_z = z
-        raw_pred = self.flc.predict_with_ann([norm_z], self.ann, self.func)
+        raw_pred = float(self.flc.predict_with_ann([norm_z], self.ann, self.func)[0])
         processed_pred = int(raw_pred + 1) # plus 1, since the range is {-1, 0, +1}
         return processed_pred
 

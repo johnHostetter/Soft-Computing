@@ -248,7 +248,7 @@ if __name__ == '__main__':
             x = dict(zip(range(1, len(y) + 1), y))
             y_pred.append(flc.infer_with_u_and_d(x))
         
-        print('accuracy w.r.t. student = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred)) == np.round(ann.predict(Z)))/len(Z)))
+        print('accuracy w.r.t. student = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred)) == np.round(ann.predict(Z)) + 1)/len(Z)))
         print('accuracy w.r.t. teacher = {}%'.format(100.0 * np.count_nonzero(np.round(np.array(y_pred) + 1) == labels)/len(Z)))
     
         if False: # enable this AFTER the study, these steps take too long and aren't needed yet

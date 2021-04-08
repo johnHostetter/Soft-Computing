@@ -6,6 +6,7 @@ Created on Wed Mar 17 20:25:46 2021
 @author: john
 """
 
+import os
 import numpy as np
 import pandas as pd
 
@@ -125,7 +126,7 @@ class FLC:
             predictions.append(prediction)
         return np.array(predictions)
     
-    def export_terms(self, to_csv=False, filename='./flc/terms.csv'): # if to_csv is not False, provide file name
+    def export_terms(self, to_csv=False, folder='./flc/', filename='terms.csv'): # if to_csv is not False, provide file name
         terms = []
         n_columns = self.table.shape[1]
         for col_idx in range(n_columns):
@@ -136,21 +137,31 @@ class FLC:
                 terms.append(rule.antecedents[antecedent_index].export())
         df = pd.DataFrame(terms)
         if to_csv:
-            df.to_csv(filename, index=False)
+            filepath = './' + folder + '/' + filename
+            df.to_csv(filepath, index=False)
             print('FLC terms successfully saved.')
         return df
     
-    def export_rules(self, to_csv=False, filename='./flc/rules.csv'): # if to_csv is not False, provide file name
+    def export_rules(self, to_csv=False, folder='./flc/', filename='rules.csv'): # if to_csv is not False, provide file name
         rules = []
         for rule in self.rules:
             rules.append(rule.export())
         df = pd.DataFrame(rules)
         if to_csv:
-            df.to_csv(filename, index=False)
+            filepath = './' + folder + '/' + filename
+            df.to_csv(filepath, index=False)
             print('FLC rules successfully saved.')
         return df
     
-    def export(self, to_csv=False):
-        terms_df = self.export_terms(to_csv)
-        rules_df = self.export_rules(to_csv)
+    def export(self, to_csv=False, folder='./flc/'):
+        try:
+            os.mkdir(folder)
+        except FileExistsError:
+            print('Folder already exists. Would you like to override the folder "%s"? [y/n]' % folder)
+            usr_input = input()
+            if usr_input.lower() != 'y':
+                print('Aborting FLC export.')
+                return None
+        terms_df = self.export_terms(to_csv, folder)
+        rules_df = self.export_rules(to_csv, folder)
         return terms_df, rules_df
