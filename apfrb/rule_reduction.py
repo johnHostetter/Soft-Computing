@@ -173,7 +173,7 @@ class RuleReducer:
                 self.apfrb.r = len(self.apfrb.rules) # update the stored count of number of rules
                 break
     
-    def step_2(self, Z, MULTIPROCESSING=False, PROCESSES=2, skip=False):
+    def step_2(self, Z, MULTIPROCESSING=False, PROCESSES=2, skip=False, plot=False):
         """
         For each rule k, compute m_k and l_k,
         if m_k * l_k is small, then delete rule k from APFRB
@@ -217,7 +217,8 @@ class RuleReducer:
             q = len(m_k_l_ks)
             xs = range(q)
             ys = sorted(m_k_l_ks)
-            line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k')
+            if plot:
+                line(range(q), sorted(m_k_l_ks), 'The m_k * l_k of each rule', 'Rules', 'm_k * l_k')
     
         print('\nThe five smallest m_k * l_k values: \n\n%s' % sorted(m_k_l_ks)[:5])
 

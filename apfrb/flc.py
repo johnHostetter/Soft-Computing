@@ -153,15 +153,18 @@ class FLC:
             print('FLC rules successfully saved.')
         return df
     
-    def export(self, to_csv=False, folder='./flc/'):
+    def export(self, to_csv=False, folder='./flc/', auto_reply=None):
         try:
             os.mkdir(folder)
         except FileExistsError:
             print('Folder already exists. Would you like to override the folder "%s"? [y/n]' % folder)
-            usr_input = input()
-            if usr_input.lower() != 'y':
-                print('Aborting FLC export.')
-                return None
+            if auto_reply is None:
+                usr_input = input()
+                if usr_input.lower() != 'y':
+                    print('Aborting FLC export.')
+                    return None
+            else:
+                print('auto-reply: yes. overwriting...')
         terms_df = self.export_terms(to_csv, folder)
         rules_df = self.export_rules(to_csv, folder)
         return terms_df, rules_df
