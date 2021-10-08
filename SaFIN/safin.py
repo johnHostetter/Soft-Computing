@@ -60,8 +60,6 @@ class SaFIN:
         self.consequents_indices_for_each_rule = consequents_indices_for_each_rule
                 
         self.P = self.antecedents_indices_for_each_rule.shape[1]
-        # temporary fix until MIMO
-        self.consequents_indices_for_each_rule = np.reshape(consequents_indices_for_each_rule, (len(consequents_indices_for_each_rule), 1))
         self.Q = self.consequents_indices_for_each_rule.shape[1]
         self.K = self.consequents_indices_for_each_rule.shape[0]
         
@@ -79,7 +77,6 @@ class SaFIN:
             end_idx = start_idx + self.J[p]
             self.W_1[p, start_idx:end_idx] = 1
             start_idx = end_idx
-            # print(W_1[p])
         
         # between antecedents and rules
         self.W_2 = np.empty((self.total_antecedents, self.K))
@@ -89,6 +86,30 @@ class SaFIN:
             for input_index, antecedent_index in enumerate(antecedents_indices_for_rule):
                 self.W_2[start_idx + antecedent_index, rule_index] = 1
                 start_idx += self.J[input_index]
+                
+        self.L = {}
+        self.total_consequents = 0
+        for q in range(self.Q):
+            fuzzy_clusters_in_O_q = set(self.consequents_indices_for_each_rule[:,q])
+            self.L[q] = len(fuzzy_clusters_in_O_q)
+            self.total_consequents += self.L[q]
+        
+        # between rules and consequents
+        self.W_3 = np.empty((self.K, self.total_consequents))
+        self.W_3[:] = np.nan
+        for rule_index, consequent_indices_for_rule in enumerate(self.consequents_indices_for_each_rule):
+            start_idx = 0
+            for output_index, consequent_index in enumerate(consequent_indices_for_rule):
+                self.W_3[rule_index, start_idx + consequent_index] = 1
+                start_idx += self.L[output_index]
+                
+        # between consequents and outputs
+        self.W_4 = np.zeros((self.total_consequents, self.Q))
+        start_idx = 0
+        for q in range(self.Q):
+            end_idx = start_idx + self.L[q]
+            self.W_4[start_idx:end_idx, q] = 1
+            start_idx = end_idx
         
     def input_layer(self, x):
         # where x is the input vector and x[i] or x_i would be the i'th element of that input vector
@@ -112,30 +133,21 @@ class SaFIN:
         self.f3 = np.nanmin(rule_activations, axis=2) # the shape is (num of observations, num of rules)
         return self.f3
     
-    def consequence_layer(self, o3):
-        self.L = {}
-        self.total_consequents = 0
-        for q in range(self.Q):
-            fuzzy_clusters_in_O_q = set(self.consequents_indices_for_each_rule[:,q])
-            self.L[q] = len(fuzzy_clusters_in_O_q)
-            self.total_consequents += self.L[q]
-        
-        # between rules and consequents
-        self.W_3 = np.empty((self.K, self.total_consequents))
-        self.W_3[:] = np.nan
-        for rule_index, consequent_indices_for_rule in enumerate(self.consequents_indices_for_each_rule):
-            start_idx = 0
-            for output_index, consequent_index in enumerate(consequent_indices_for_rule):
-                self.W_3[rule_index, start_idx + consequent_index] = 1
-                start_idx += self.L[output_index]
-                
+    def consequence_layer(self, o3):                
         consequent_activations = np.swapaxes(np.multiply(o3, self.W_3.T[:, np.newaxis]), 0, 1)
         self.f4 = np.nanmax(consequent_activations, axis=2)
         return self.f4
     
     def output_layer(self, o4):
-        numerator = np.nansum((o4 * self.term_dict['consequent_centers'] * self.term_dict['consequent_widths']), axis=1)
-        denominator = np.nansum((o4 * self.term_dict['consequent_widths']), axis=1)
+        temp_transformation = np.swapaxes(np.multiply(o4, self.W_4.T[:, np.newaxis]), 0, 1)
+        
+        flat_centers = self.term_dict['consequent_centers'].flatten()
+        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_widths = self.term_dict['consequent_widths'].flatten()
+        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        
+        numerator = np.nansum((temp_transformation * flat_centers * flat_widths), axis=2)
+        denominator = np.nansum((temp_transformation * flat_widths), axis=2)
         self.f5 = numerator / denominator
         return self.f5
 
