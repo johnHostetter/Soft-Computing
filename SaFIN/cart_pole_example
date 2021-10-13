@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Oct  9 21:56:59 2021
+
+@author: john
+"""
+
+import gym
+import time
+import copy
+import torch
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+
+try:
+    from SaFIN.safin import SaFIN
+except ImportError:
+    from safin import SaFIN
+# from torch.autograd import Variable
+# import random
+# from PIL import Image
+# from IPython.display import clear_output
+# import math
+# # import torchvision.transforms as T
+# import numpy as np
+
+def play_model(env, model, episodes, gamma=0.9, 
+               title = 'DQL', verbose=True):
+    global FUZZY
+    """Deep Q Learning algorithm using the DQN. """
+    final = []
+    memory = []
+    episode_i=0
+    for episode in range(episodes):
+        episode_i+=1
+        
+        # Reset state
+        state = env.reset()
+        done = False
+        total = 0
+        
+        while not done:
+            try:
+                q_values = model.predict([state])
+                action = np.argmax(q_values)
+                # Take action and add reward to total
+                next_state, reward, done, _ = env.step(action)
+            except AssertionError:
+                q_values = model.predict(state)
+                action = torch.argmax(q_values).item()
+            
+                # Take action and add reward to total
+                next_state, reward, done, _ = env.step(action)
+            
+            # Update total and memory
+            total += reward
+            state = next_state
+            memory.append((state, action, next_state, reward, done))
+        
+        memory.append((state, action, next_state, reward, done))
+        final.append(total)
+        plot_res(final, title)
+        
+        if verbose:
+            print("episode: {}, total reward: {}".format(episode_i, total))
+            
+    return final, memory
+
+def random_search(env, episodes, 
+                  title='Random Strategy'):
+    """ Random search strategy implementation."""
+    final = []
+    memory = []
+    for episode in range(episodes):
+        state = env.reset()
+        done = False
+        total = 0
+        while not done:
+            # Sample random actions
+            action = env.action_space.sample()
+            # Take action and extract results
+            next_state, reward, done, _ = env.step(action)
+            # Update reward
+            total += reward
+            memory.append((state, action, next_state, reward, done))
+
+            if done:
+                memory.append((state, action, next_state, reward, done))
+                break
+        # Add to the final reward
+        final.append(total)
+        plot_res(final,title)
+    return memory, final
+
+def plot_res(values, title=''):   
+    ''' Plot the reward curve and histogram of results over time.'''
+    # Update the window after each episode
+    # clear_output(wait=True)
+    
+    # Define the figure
+    f, ax = plt.subplots(nrows=1, ncols=2, figsize=(12,5))
+    f.suptitle(title)
+    ax[0].plot(values, label='score per run')
+    ax[0].axhline(195, c='red',ls='--', label='goal')
+    ax[0].set_xlabel('Episodes')
+    ax[0].set_ylabel('Reward')
+    x = range(len(values))
+    ax[0].legend()
+    # Calculate the trend
+    try:
+        z = np.polyfit(x, values, 1)
+        p = np.poly1d(z)
+        ax[0].plot(x,p(x),"--", label='trend')
+    except:
+        print('')
+    
+    # Plot the histogram of results
+    ax[1].hist(values[-50:])
+    ax[1].axvline(195, c='red', label='goal')
+    ax[1].set_xlabel('Scores per Last 50 Episodes')
+    ax[1].set_ylabel('Frequency')
+    ax[1].legend()
+    plt.show()
+
+
+model = SaFIN(alpha=0.2, beta=0.6)
+env = gym.make('CartPole-v1')
+
+def q_learning(env, model, episodes, gamma=0.9, 
+               epsilon=0.3, eps_decay=0.99,
+               replay=False, replay_size=20, 
+               title = 'DQL', double=False, 
+               n_update=10, soft=False, verbose=True):
+    global FUZZY
+    """Deep Q Learning algorithm using the DQN. """
+    final = []
+    memory = []
+    episode_i=0
+    sum_total_replay_time=0
+    for episode in range(episodes):
+        episode_i+=1
+        if double and not soft:
+            # Update target network every n_update steps
+            if episode % n_update == 0:
+                if FUZZY:
+                    model.target_update(memory)
+                else:
+                    model.target_update(None)
+        if double and soft:
+            model.target_update()
+        
+        # Reset state
+        state = env.reset()
+        done = False
+        total = 0
+        
+        while not done:
+            # Implement greedy search policy to explore the state space
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                q_values = model.predict(state)
+                action = torch.argmax(q_values).item()
+            
+            # Take action and add reward to total
+            next_state, reward, done, _ = env.step(action)
+            
+            # Update total and memory
+            total += reward
+            memory.append((state, action, next_state, reward, done))
+            q_values = model.predict(state).tolist()
+             
+            if done:
+                if not replay:
+                    q_values[action] = reward
+                    # Update network weights
+                    model.update(state, q_values)
+                break
+
+            if replay:
+                t0=time.time()
+                # Update network weights using replay memory
+                model.replay(memory, replay_size, gamma)
+                t1=time.time()
+                sum_total_replay_time+=(t1-t0)
+            else: 
+                # Update network weights using the last step only
+                q_values_next = model.predict(next_state)
+                q_values[action] = reward + gamma * torch.max(q_values_next).item()
+                model.update(state, q_values)
+
+            state = next_state
+        
+        # Update epsilon
+        epsilon = max(epsilon * eps_decay, 0.01)
+        final.append(total)
+        plot_res(final, title)
+        
+        if verbose:
+            print("episode: {}, total reward: {}".format(episode_i, total))
+            if replay:
+                print("Average replay time:", sum_total_replay_time/episode_i)
+        
+    return final
+
+# Number of states
+n_state = env.observation_space.shape[0]
+# Number of actions
+n_action = env.action_space.n
+# Number of episodes
+episodes = 100
+# Number of hidden nodes in the DQN
+n_hidden = 50
+# Learning rate
+lr = 0.001
+
+
+
+# Get DQN results
+from dqn import DQN, DQN_replay, DQN_double, fuzzy_DQN_double, DQN_replay_w_distill, DQN_double_distill
+# simple_dqn = DQN(n_state, n_action, n_hidden, lr)
+# simple = q_learning(env, simple_dqn, episodes, gamma=.9, epsilon=0.3)
+
+# # Get replay results
+# dqn_replay = DQN_replay(n_state, n_action, n_hidden, lr)
+# replay = q_learning(env, dqn_replay, 
+#                     episodes, gamma=.9, 
+#                     epsilon=0.2, replay=True, 
+#                     title='DQL with Replay')
+
+# Get replay results
+# FUZZY = False
+# dqn_double = DQN_double(n_state, n_action, n_hidden, lr)
+# double =  q_learning(env, dqn_double, episodes, gamma=.95, 
+#                     epsilon=0.5, replay=True, double=True,
+#                     title='Double DQL with Replay', n_update=10)
+
+# Get fuzzy double DQN replay results
+# FUZZY = True
+# fuzzy_dqn_double = fuzzy_DQN_double(n_state, n_action, n_hidden, lr)
+# fuzzy_double =  q_learning(env, fuzzy_dqn_double, episodes, gamma=.95, 
+#                     epsilon=0.5, replay=True, double=True,
+#                     title='Fuzzy Double DQL with Replay', n_update=5)
+
+# DQN + replay + online policy distillation
+teachers = []
+students = []
+for i in range(10):
+    FUZZY = True
+    ddqn_replay_w_distill= DQN_double_distill(n_state, n_action, n_hidden, lr)
+    student =  q_learning(env, ddqn_replay_w_distill, episodes, gamma=.95, 
+                        epsilon=0.5, replay=True, double=True,
+                        title='DDQL with Replay + policy distillation', n_update=5)
+    
+    teacher, memories = play_model(env, ddqn_replay_w_distill, 100, title='Deep Q-Network (Teacher) + Replay')
+    try:
+        ddqn_replay_w_distill.policy_distillation(memories)
+        student, memories = play_model(env, ddqn_replay_w_distill.student, 100, title='SaFIN (Student) Q-Network')
+        teachers.append(teacher)
+        students.append(student)
+    except ValueError: # line 348: ValueError: operands could not be broadcast together with shapes (500,2,5) (6,) 
+        continue
+# X = np.array([memories[i][0] for i in range(len(memories))])
+# Y = dqn_double.predict(X).numpy()
+# safin = SaFIN(0.01, 0.95)
+# safin.fit(X, Y, batch_size=1000)
+# play_model(env, fuzzy_dqn_double, 30)
+
+# def fuzzy_q_learning(env, model, episodes, gamma=0.9, 
+#                epsilon=0.3, eps_decay=0.99,
+#                replay=False, replay_size=20, 
+#                title = 'SAFQL', double=False, 
+#                n_update=10, soft=False, verbose=True):
+#     """Deep Q Learning algorithm using the DQN. """
+#     final = []
+#     memory = []
+#     episode_i=0
+#     sum_total_replay_time=0
+#     for episode in range(episodes):
+#         episode_i+=1
+        
+#         # Reset state
+#         state = env.reset()
+#         done = False
+#         total = 0
+        
+#         while not done:
+#             # Implement greedy search policy to explore the state space
+#             if random.random() < epsilon:
+#                 action = env.action_space.sample()
+#             elif len(model.rules) == 0:
+#                 action = env.action_space.sample()
+#             else:
+#                 q_values = model.predict(state)
+#                 action = np.argmax(q_values)
+            
+#             # Take action and add reward to total
+#             next_state, reward, done, _ = env.step(action)
+            
+#             # Update total and memory
+#             total += reward
+#             memory.append((state, action, next_state, reward, done))
+            
+#             if len(model.rules) == 0:
+#                 q_values = np.array([0.0] * env.action_space.n)
+#                 q_values[action] = reward
+#                 q_values = np.reshape(q_values, (1, env.action_space.n))
+#             else:
+#                 q_values = model.predict(state).tolist()
+             
+#             if done:
+#                 if not replay:
+#                     q_values[0][int(action)] = reward
+#                     # Update network weights
+#                     state = np.reshape(state, (1, state.shape[0]))
+#                     model.fit(state, np.array(q_values), rule_pruning=False)
+#                 break
+
+#             # Update network weights using the last step only
+#             if len(model.rules) == 0:
+#                 q_values_next = np.array([0.0] * env.action_space.n)
+#                 q_values_next = np.reshape(q_values, (1, env.action_space.n))
+#             else:
+#                 q_values_next = model.predict(next_state)
+            
+#             try:
+#                 q_values[0][action] = reward + gamma * np.max(q_values_next)
+#             except IndexError:
+#                 print('q %s' % q_values)
+#                 print('ac %s ' % action)
+#             try:
+#                 state = np.reshape(state, (1, state.shape[0]))
+#             except ValueError:
+#                 print(state)
+#             try:
+#                 q_values = np.reshape(q_values, (1, env.action_space.n))
+#             except ValueError:
+#                 print(q_values)
+#             model.fit(state, q_values, rule_pruning=False)
+
+#             state = next_state
+        
+#         # Update epsilon
+#         epsilon = max(epsilon * eps_decay, 0.01)
+#         final.append(total)
+#         plot_res(final, title)
+        
+#         if verbose:
+#             print("episode: {}, total reward: {}".format(episode_i, total))
+#             if replay:
+#                 print("Average replay time:", sum_total_replay_time/episode_i)
+        
+#     return final
+
+# fuzzy_q_learning(env, model, 100)

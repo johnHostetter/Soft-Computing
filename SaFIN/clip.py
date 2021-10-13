@@ -6,6 +6,7 @@ Created on Tue Jul 27 12:21:50 2021
 @author: john
 """
 
+import time
 import numpy as np
 
 def gaussian(x, center, sigma):
@@ -31,6 +32,8 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6):
                 left_width = np.sqrt(-1.0 * (np.power(min_p - x[p], 2) / np.log(alpha)))
                 right_width = np.sqrt(-1.0 * (np.power(max_p - x[p], 2) / np.log(alpha)))
                 sigma_1p = R(left_width, right_width)
+                if len(X) == 1:
+                    sigma_1p = 0.1
                 antecedents.append([{'center': c_1p, 'sigma': sigma_1p, 'support':1}])
         else:
             # calculate the similarity between the input and existing fuzzy clusters
@@ -109,6 +112,7 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6):
     return antecedents
 
 def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_weights=[]):
+    start = time.time()
     rules = existing_rules
     weights = existing_weights
     for training_tuple in zip(X, Y):
@@ -136,7 +140,7 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_we
             j_star_q = np.argmax(SM_jqs)
             C_star_qs.append(j_star_q)
             
-        R_star = {'A':A_star_js, 'C': C_star_qs, 'CF': CF}
+        R_star = {'A':A_star_js, 'C': C_star_qs, 'CF': CF, 'time_added': start}
         
         if not rules:
             # no rules in knowledge base yet
@@ -153,6 +157,9 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_we
                         rule['CF'] = min(rule['CF'], R_star['CF'])
                         add_new_rule = False
                         break
+                    elif (rule['A'] == R_star['A']): # my own custom else-if statement
+                        if rule['CF'] <= R_star['CF']:
+                            add_new_rule = False
                 except ValueError: # this happens because R_star['A'] and R_star['C'] are Numpy arrays
                     if all(rule['A'] == list(R_star['A'])) and all(rule['C'] == list(R_star['C'])):
                         # the generated rule is not unique, it already exists, enhance this rule's weight
@@ -160,6 +167,9 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_we
                         rule['CF'] = min(rule['CF'], R_star['CF'])
                         add_new_rule = False
                         break
+                    elif all(rule['A'] == list(R_star['A'])): # my own custom else-if statement
+                        if rule['CF'] <= R_star['CF']:
+                            add_new_rule = False
             if add_new_rule:
                 rules.append(R_star)
                 weights.append(1.0)
@@ -171,13 +181,14 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_we
     for k in range(len(rules)):
         indices = np.where(np.all(all_antecedents == np.array(rules[k]['A']), axis=1))[0]
         if len(indices) > 1: 
-            if len(repeated_rule_indices) == 0:
+            if len(repeated_rule_indices) == 0: # this can be combined with the following elif-statement
                 repeated_rule_indices.add(tuple(indices))
-            elif len(repeated_rule_indices) > 0:
+            elif len(repeated_rule_indices) > 0: # this can be combined with the above if-statement
                 repeated_rule_indices.add(tuple(indices))
     
     for indices in repeated_rule_indices:
-        weights_to_compare = [rules[idx]['CF'] for idx in indices]
+        # weights_to_compare = [rules[idx]['CF'] for idx in indices] # HyFIS approach to rule creation
+        weights_to_compare = [weights[idx] for idx in indices]
         strongest_rule_index = indices[np.argmax(weights_to_compare)] # keep the rule with the greatest weight to it
         for index in indices:
             if index != strongest_rule_index:
