@@ -168,7 +168,7 @@ class fuzzy_DQN_double(DQN):
 class DQN_replay_w_distill(DQN):
     def __init__(self, state_dim, action_dim, hidden_dim=64, lr=0.05):
         super().__init__(state_dim, action_dim, hidden_dim, lr)
-        self.student = SaFIN(0.1, 0.9) # 0.1, 0.9 get decent results sometimes
+        self.student = SaFIN(0.01, 0.95) # 0.1, 0.9 get decent results sometimes
         
     def replay(self, memory, size, gamma=0.9):
         """New replay function"""
@@ -197,25 +197,25 @@ class DQN_replay_w_distill(DQN):
         
             self.update(states.tolist(), all_q_values.tolist())
             
-            if len(memory) % 100 == 0:
+            if len(memory) % 1000 == 0:
                 self.policy_distillation(memory)
             
     def policy_distillation(self, memory):
         # train the student model after replay with memory
-        limited_memory = memory[-100:]
+        limited_memory = memory[-1000:]
         # limited_memory = memory
         X = np.array([limited_memory[i][0] for i in range(len(limited_memory))])
         Y = self.predict(X).numpy()
         # size = int(np.round(X.shape[0] / 2))
         size = 100
         # self.target.fit(X, Y, batch_size=min(size, 200), epochs=1, verbose=True, shuffle=False)
-        self.student.fit(X, Y, batch_size=size, epochs=1, verbose=True, shuffle=True, rule_pruning=True)
+        self.student.fit(X, Y, batch_size=size, epochs=10, verbose=True, shuffle=True, rule_pruning=True)
         
 class DQN_double_distill(DQN):
     def __init__(self, state_dim, action_dim, hidden_dim, lr):
         super().__init__(state_dim, action_dim, hidden_dim, lr)
         self.target = copy.deepcopy(self.model)
-        self.student = SaFIN(0.2, 0.95) # 0.01, 0.99 get decent results sometimes
+        self.student = SaFIN(0.1, 0.95) # 0.01, 0.99 get decent results sometimes
         
     def target_predict(self, s):
         ''' Use target network to make predicitons.'''
@@ -256,7 +256,7 @@ class DQN_double_distill(DQN):
             
     def policy_distillation(self, memory):
         # train the student model after replay with memory
-        limited_memory = memory[-2000:]
+        limited_memory = memory[-4000:]
         # limited_memory = memory
         X = np.array([limited_memory[i][0] for i in range(len(limited_memory))])
         Y = self.target_predict(X).numpy()
@@ -264,6 +264,7 @@ class DQN_double_distill(DQN):
         # Y = Y - Y.mean() / (Y.max() - Y.min()) # try standardizing the Q values; this worked 500+, and okay the one time ~150
 
         size = int(np.round(X.shape[0] / 2))
+        size = 500
         # size = 100
         # self.target.fit(X, Y, batch_size=min(size, 200), epochs=1, verbose=True, shuffle=False)
-        self.student.fit(X, Y, batch_size=500, epochs=1, verbose=True, shuffle=True, rule_pruning=False)
+        self.student.fit(X, Y, batch_size=size, epochs=10, verbose=True, shuffle=True, rule_pruning=False)

@@ -428,6 +428,59 @@ class SaFIN:
         est_Y = self.predict(X)
         return RMSE(est_Y, Y), weighted_RMSE(est_Y, Y)
     
+    def backpropagation(self, x, y):
+        
+        # (1) calculating the error signal in the output layer
+        
+        e5_m = y - self.o5 # y actual minus y predicted
+        e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node
+        error = (self.o4 * e5)
+        
+        # delta centers
+        flat_centers = self.term_dict['consequent_centers'].flatten()
+        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_widths = self.term_dict['consequent_widths'].flatten()
+        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        # y4_k = (centers * self.W_4.T)
+        # numerator = (widths * y4_k)
+        widths = np.multiply(flat_widths[:,np.newaxis], self.W_4).T
+        num = np.multiply(widths[np.newaxis,:,:], self.o4[:, np.newaxis,:])
+        den = num.sum(axis=2)
+        consequent_delta_c = (num / den[:, :, np.newaxis]).sum(axis=1)
+        
+        
+        consequent_delta_widths = 0.0
+        
+        return consequent_delta_c, consequent_delta_widths
+
+        
+        
+        
+        
+        # num = (widths * self.o4)
+        # den = (num[:, np.newaxis, :] * self.W_4.T)
+        # den = np.dot(num, self.W_4)
+        
+        denominator = np.sum((widths * y4_k), axis=1)
+        fraction = np.array([numerator[i] / denominator[i] for i in range(numerator.shape[0])])
+        term_across_each_consequent = np.sum(fraction, axis=0)
+        consequent_delta_c = error * term_across_each_consequent
+        
+        # delta widths
+
+        # c_lk = (centers * self.W_4.T).T
+        # numerator_lhs = (c_lk * denominator).T
+        # sigma_lk = (widths * self.W_4.T).T
+        # numerator_rhs = np.sum((y4_k * sigma_lk.T * c_lk.T), axis=1)
+        
+        # subtraction = np.array([numerator_lhs[i] - numerator_rhs[i] for i in range(numerator_lhs.shape[0])])
+        
+        # # denominator is the same as consequent centers, but uses power to 2
+        # pow_denominator = np.power(denominator, 2)
+        consequent_delta_widths = (numerator_lhs - numerator_rhs) / denominator
+        
+        return consequent_delta_c, consequent_delta_widths
+    
     def fit(self, X, Y, batch_size=None, epochs=1, verbose=False, shuffle=True, rule_pruning=True):
         if self.P is None:
             self.P = X.shape[1]
@@ -461,7 +514,7 @@ class SaFIN:
                     self.X_mins, self.X_maxes, self.Y_mins, self.Y_maxes = X_mins, X_maxes, Y_mins, Y_maxes
                     
                 self.antecedents = CLIP(batch_X, batch_Y, X_mins, X_maxes, 
-                                        self.antecedents, alpha=0.2, beta=0.6)
+                                        self.antecedents, alpha=0.1, beta=0.8)
                 self.consequents = CLIP(batch_Y, batch_X, Y_mins, Y_maxes, 
                                         self.consequents, alpha=self.alpha, beta=self.beta)
                 
@@ -504,6 +557,112 @@ class SaFIN:
                 if rule_pruning:
                     self.rule_pruning(batch_X, batch_Y, batch_size, verbose)
                 print()
+                
+                l_rate = 0.01
+                consequent_delta_c, consequent_delta_widths = self.backpropagation(batch_X, batch_Y)
+                
+                # self.term_dict['consequent_centers'] -= l_rate * np.reshape(consequent_delta_c.mean(axis=0), self.term_dict['consequent_centers'].shape)
+                # adjust the array to match the self.term_dict
+                max_array_size = max(self.L.values())
+                tmp = np.empty((self.Q, max_array_size))
+                tmp[:] = np.nan
+                
+                start = 0
+                avg_consequent_delta_c = consequent_delta_c.mean(axis=0)
+                for q in range(self.Q):
+                    end = start + self.L[q]
+                    # print(avg_consequent_delta_c[start:end])
+                    # print(avg_consequent_delta_c[start:end].shape)
+                    print(tmp.shape)
+                    print(avg_consequent_delta_c[start:end].shape)
+                    tmp[q, :self.L[q]] = avg_consequent_delta_c[start:end]
+                    start += end
+                    # tmp[q,:self.L[q]]
+                    
+                self.term_dict['consequent_centers'] -= l_rate * tmp
+                
+                # init_rmse, _ = self.evaluate(batch_X, batch_Y)
+                
+                # l_rate = 0.01 # 0.1 was used for Pyrenees data
+                # n_epoch = 1000
+                # epsilon = 0.25
+                # epoch = 0
+                # curr_rmse = init_rmse
+                # prev_rmse = init_rmse
+                # while curr_rmse <= prev_rmse:
+                #     # print('epoch %s' % epoch)
+                #     y_predicted = []
+                #     deltas = None
+                #     # for idx, x in enumerate(train_X):
+                #     #     # print(epoch, idx)
+                #     #     y = train_Y[idx][0]
+                #     #     # y = Y[idx]
+                        
+                #     #     # if idx == 59:
+                #     #     #     print('wait')
+                #     #     iterations = 1
+                #     #     while True:
+                #     consequent_delta_c, consequent_delta_widths = self.backpropagation(batch_X, batch_Y)
+                #     # if deltas is None:
+                #     #     deltas = {'c_c':consequent_delta_c, 'c_w':consequent_delta_widths}
+                #     # else:
+                #     #     deltas['c_c'] += consequent_delta_c
+                #     #     deltas['c_w'] += consequent_delta_widths
+                #         # deltas['a_c'] += antecedent_delta_c
+                #         # deltas['a_w'] += antecedent_delta_widths
+                #             # if np.abs(o5 - y) < epsilon or iterations >= 250:
+                #             #     y_predicted.append(o5)
+                #             #     print('achieved with %s and %s iterations' % (np.abs(o5 - y), iterations))
+                #             #     break
+                #             # else:
+                #             #     # print(np.abs(o5 - y))
+                #             #     consequent_delta_c, consequent_delta_widths, antecedent_delta_c, antecedent_delta_widths = fnn.backpropagation(x, y)
+                #             #     # print(consequent_delta_c)
+                #             #     # print(consequent_delta_widths)
+                #             #     # print(antecedent_delta_c)
+                #             #     # print(antecedent_delta_widths)
+                                
+                #             #     # fnn.term_dict['consequent_centers'] += 1e-4 * consequent_delta_c
+                #             #     # fnn.term_dict['consequent_widths'] += 1e-8 * consequent_delta_widths
+                #             #     # fnn.term_dict['antecedent_centers'] += 1e-4 * antecedent_delta_c
+                #             #     # fnn.term_dict['antecedent_widths'] += 1e-8 * antecedent_delta_widths
+                                
+                #             #     fnn.term_dict['consequent_centers'] += l_rate * consequent_delta_c
+                #             #     # fnn.term_dict['consequent_widths'] += 1.0 * l_rate * consequent_delta_widths
+                #             #     # fnn.term_dict['antecedent_centers'] += l_rate * antecedent_delta_c
+                #             #     # fnn.term_dict['antecedent_widths'] += 1.0 * l_rate * antecedent_delta_widths
+                                
+                #             #     # remove anything less than or equal to zero for the linguistic term widths
+                #             #     # if (fnn.term_dict['consequent_widths'] <= 0).any() or (fnn.term_dict['antecedent_widths'] <= 0).any():
+                #             #     #     print('fix weights')
+                #             #     # fnn.term_dict['consequent_widths'][fnn.term_dict['consequent_widths'] <= 0.0] = 1e-1
+                #             #     # fnn.term_dict['antecedent_widths'][fnn.term_dict['antecedent_widths'] <= 0.0] = 1e-1
+                                
+                #             #     iterations += 1
+                #     self.term_dict['consequent_centers'] -= l_rate * consequent_delta_c.mean(axis=0)
+                #     # self.term_dict['consequent_widths'] -= l_rate * (deltas['c_w'] / len(batch_X))
+                #     # fnn.term_dict['antecedent_centers'] -= l_rate * (deltas['a_c'] / len(train_X))
+                #     # fnn.term_dict['antecedent_widths'] -= l_rate * (deltas['a_w'] / len(train_X))
+                    
+                #     # y_predicted = []
+                #     # for tupl in zip(train_X, train_Y):
+                #     #     x = tupl[0]
+                #     #     d = tupl[1]
+                #     #     y_predicted.append((safin.feedforward(x)))
+                        
+                #     # y_predicted = self.feedforward(train_X)
+                    
+                #     prev_rmse = curr_rmse
+                #     curr_rmse, _ = self.evaluate(batch_X, batch_Y)
+                #     print('--- epoch %s --- rmse after tuning = %s (prev rmse was %s; init rmse was %s)' % (epoch, curr_rmse, prev_rmse, init_rmse))
+                #     epoch += 1
+                
+                #     if curr_rmse > prev_rmse:
+                #         # reverse the updates
+                #         self.term_dict['consequent_centers'] += l_rate * consequent_delta_c.mean(axis=0)
+                #         # self.term_dict['consequent_widths'] += l_rate * (deltas['c_w'] / len(batch_X))
+                #         # fnn.term_dict['antecedent_centers'] += l_rate * (deltas['a_c'] / len(train_X))
+                #         # fnn.term_dict['antecedent_widths'] += l_rate * (deltas['a_w'] / len(train_X))
 
             start = time.time()
             rmse_before_prune, _ = self.evaluate(shuffled_X, shuffled_Y)
@@ -516,3 +675,6 @@ class SaFIN:
         end = time.time()
         print('--- Training RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
         print()
+        
+        est_Y = self.predict(shuffled_X)
+        return self.backpropagation(est_Y, shuffled_Y)

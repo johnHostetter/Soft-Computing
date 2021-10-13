@@ -203,7 +203,7 @@ def q_learning(env, model, episodes, gamma=0.9,
             if replay:
                 print("Average replay time:", sum_total_replay_time/episode_i)
         
-    return final
+    return final, memory
 
 # Number of states
 n_state = env.observation_space.shape[0]
@@ -247,21 +247,21 @@ from dqn import DQN, DQN_replay, DQN_double, fuzzy_DQN_double, DQN_replay_w_dist
 # DQN + replay + online policy distillation
 teachers = []
 students = []
-for i in range(10):
+for i in range(1):
     FUZZY = True
     ddqn_replay_w_distill= DQN_double_distill(n_state, n_action, n_hidden, lr)
-    student =  q_learning(env, ddqn_replay_w_distill, episodes, gamma=.95, 
+    student, memory =  q_learning(env, ddqn_replay_w_distill, episodes, gamma=.95, 
                         epsilon=0.5, replay=True, double=True,
                         title='DDQL with Replay + policy distillation', n_update=5)
     
-    teacher, memories = play_model(env, ddqn_replay_w_distill, 100, title='Deep Q-Network (Teacher) + Replay')
-    try:
-        ddqn_replay_w_distill.policy_distillation(memories)
-        student, memories = play_model(env, ddqn_replay_w_distill.student, 100, title='SaFIN (Student) Q-Network')
-        teachers.append(teacher)
-        students.append(student)
-    except ValueError: # line 348: ValueError: operands could not be broadcast together with shapes (500,2,5) (6,) 
-        continue
+    teacher, memories = play_model(env, ddqn_replay_w_distill, 10, title='Deep Q-Network (Teacher) + Replay')
+    # try:
+    ddqn_replay_w_distill.policy_distillation(memory)
+    student, _ = play_model(env, ddqn_replay_w_distill.student, 30, title='SaFIN (Student) Q-Network')
+    teachers.append(teacher)
+    students.append(student)
+    # except ValueError: # line 348: ValueError: operands could not be broadcast together with shapes (500,2,5) (6,) 
+    #     continue
 # X = np.array([memories[i][0] for i in range(len(memories))])
 # Y = dqn_double.predict(X).numpy()
 # safin = SaFIN(0.01, 0.95)
