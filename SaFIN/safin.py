@@ -330,7 +330,9 @@ class SaFIN:
         flat_widths = self.term_dict['antecedent_widths'].flatten()
         flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
 
-        self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / np.power(flat_widths, 2)))
+        denominator = np.power(flat_widths, 2)
+        denominator = np.where(denominator == 0.0, np.finfo(np.float).eps, denominator) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / denominator))
         
         return self.f2 # shape is (num of inputs, num of all antecedents)
     
@@ -448,10 +450,72 @@ class SaFIN:
         den = num.sum(axis=2)
         consequent_delta_c = (num / den[:, :, np.newaxis]).sum(axis=1)
         
+        # delta widths
+        c_lk = (flat_centers * self.W_4.T)
+        lhs_term = np.dot(den, c_lk)
+        rhs_term = np.multiply(num, c_lk)
+        compatible_rhs_term = rhs_term.sum(axis=1)
+        difference = lhs_term - compatible_rhs_term
+        numerator = np.multiply(self.o4, difference)
+        denominator = np.power(den, 2)
+        compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
+        division = (compatible_numerator / denominator[:, :, np.newaxis])
+        consequent_delta_widths = division.sum(axis=1)
         
-        consequent_delta_widths = 0.0
+        # layer 4 error signal
+        numerator = (flat_widths * difference)
+        compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
+        division = (compatible_numerator / denominator[:, :, np.newaxis])
+        layer_4_error_rhs = division.sum(axis=1)
+        layer_4_error = error * layer_4_error_rhs
         
-        return consequent_delta_c, consequent_delta_widths
+        # layer 3 error signal
+        layer_3_error = (layer_4_error[:,np.newaxis,:] * self.W_3)
+        layer_3_error = np.nansum(layer_3_error, axis=2)
+        
+        # layer 2 error signal
+        antecedent_activations = (self.o2[:,np.newaxis,:] * self.W_2.T) # shape is (num of observations, num of rules, num of antecedents)
+        y2_i = (self.o2[:,np.newaxis,:] * antecedent_activations)
+        r = np.nanargmin(y2_i, axis=2) # shape is (num of observations, num of rules)
+        summations = np.nansum(layer_3_error[:,:,np.newaxis] * self.W_2.T[np.newaxis,:,:], axis=1)
+        dE_dy_i = np.zeros(self.o2.shape)
+        
+        for observation_idx in range(r.shape[0]):
+            antecedent_indices = np.unique(r[observation_idx])
+            for antecedent_index in antecedent_indices:
+                rule_indices = np.where(r[observation_idx] == antecedent_index)[0]
+                dE_dy_i[observation_idx, antecedent_index] = layer_3_error[observation_idx, rule_indices].sum()
+                
+        # delta centers
+        antecedent_delta_c_lhs = (np.multiply(dE_dy_i, self.o2))
+        # remove the stored np.nan values
+        shape = antecedent_delta_c_lhs.shape
+        antecedent_delta_c_lhs = antecedent_delta_c_lhs[~np.isnan(antecedent_delta_c_lhs)]
+        antecedent_delta_c_lhs = antecedent_delta_c_lhs.reshape(shape[0], int(antecedent_delta_c_lhs.shape[0] / shape[0])) # shape is (num of observations, num of all antecedents [nonapplicable antecedents removed])
+        antecedent_delta_c_rhs_num = 2 * (x[:,:,np.newaxis] - self.term_dict['antecedent_centers'])
+        antecedent_delta_c_rhs_den = np.power(self.term_dict['antecedent_widths'], 2)
+        antecedent_delta_c_rhs_den = np.where(antecedent_delta_c_rhs_den == 0.0, np.finfo(np.float).eps, antecedent_delta_c_rhs_den) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+
+        antecedent_delta_c_rhs = (antecedent_delta_c_rhs_num / antecedent_delta_c_rhs_den)
+        shape = antecedent_delta_c_rhs.shape
+        compatible_antecedent_delta_c_rhs = antecedent_delta_c_rhs.reshape(shape[0], shape[1]*shape[2]) # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
+        # remove the stored np.nan values
+        compatible_antecedent_delta_c_rhs = compatible_antecedent_delta_c_rhs[~np.isnan(compatible_antecedent_delta_c_rhs)].reshape(antecedent_delta_c_lhs.shape)
+        antecedent_delta_c = antecedent_delta_c_lhs * compatible_antecedent_delta_c_rhs
+        
+        # delta widths
+        antecedent_delta_widths_rhs_num = 2 * np.power((x[:,:,np.newaxis] - self.term_dict['antecedent_centers']), 2)
+        antecedent_delta_widths_rhs_den = np.power(self.term_dict['antecedent_widths'], 3)
+        antecedent_delta_widths_rhs_den = np.where(antecedent_delta_widths_rhs_den == 0.0, np.finfo(np.float).eps, antecedent_delta_widths_rhs_den) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        antecedent_delta_widths_rhs = (antecedent_delta_widths_rhs_num / antecedent_delta_widths_rhs_den)
+        shape = antecedent_delta_widths_rhs.shape
+        compatible_antecedent_delta_widths_rhs = antecedent_delta_widths_rhs.reshape(shape[0], shape[1]*shape[2]) # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
+        # remove the stored np.nan values
+        compatible_antecedent_delta_widths_rhs = compatible_antecedent_delta_widths_rhs[~np.isnan(compatible_antecedent_delta_widths_rhs)].reshape(antecedent_delta_c_lhs.shape)
+        
+        antecedent_delta_widths = antecedent_delta_c_lhs * compatible_antecedent_delta_widths_rhs
+        
+        return consequent_delta_c, consequent_delta_widths, antecedent_delta_c, antecedent_delta_widths
 
         
         
@@ -558,8 +622,8 @@ class SaFIN:
                     self.rule_pruning(batch_X, batch_Y, batch_size, verbose)
                 print()
                 
-                l_rate = 0.01
-                consequent_delta_c, consequent_delta_widths = self.backpropagation(batch_X, batch_Y)
+                l_rate = 0.001
+                consequent_delta_c, consequent_delta_widths, antecedent_delta_centers, antecedent_delta_widths = self.backpropagation(batch_X, batch_Y)
                 
                 # self.term_dict['consequent_centers'] -= l_rate * np.reshape(consequent_delta_c.mean(axis=0), self.term_dict['consequent_centers'].shape)
                 # adjust the array to match the self.term_dict
@@ -576,10 +640,81 @@ class SaFIN:
                     print(tmp.shape)
                     print(avg_consequent_delta_c[start:end].shape)
                     tmp[q, :self.L[q]] = avg_consequent_delta_c[start:end]
-                    start += end
+                    start = end
                     # tmp[q,:self.L[q]]
                     
+                    
                 self.term_dict['consequent_centers'] -= l_rate * tmp
+                    
+                # adjust the array to match the self.term_dict
+                max_array_size = max(self.L.values())
+                tmp = np.empty((self.Q, max_array_size))
+                tmp[:] = np.nan
+                
+                start = 0
+                avg_consequent_delta_widths = consequent_delta_widths.mean(axis=0)
+                for q in range(self.Q):
+                    end = start + self.L[q]
+                    # print(avg_consequent_delta_c[start:end])
+                    # print(avg_consequent_delta_c[start:end].shape)
+                    print(tmp.shape)
+                    print(avg_consequent_delta_widths[start:end].shape)
+                    tmp[q, :self.L[q]] = avg_consequent_delta_widths[start:end]
+                    start = end
+                    # tmp[q,:self.L[q]]
+                    
+                    
+                    
+                self.term_dict['consequent_widths'] -= l_rate * tmp
+                
+                
+                
+                # ANTECEDENTS
+                
+                # adjust the array to match the self.term_dict
+                max_array_size = max(self.J.values())
+                tmp = np.empty((self.P, max_array_size))
+                tmp[:] = np.nan
+                
+                start = 0
+                avg_antecedent_delta_c = antecedent_delta_centers.mean(axis=0)
+                for p in range(self.P):
+                    end = start + self.J[p]
+                    # print(avg_consequent_delta_c[start:end])
+                    # print(avg_consequent_delta_c[start:end].shape)
+                    print(tmp.shape)
+                    print(avg_antecedent_delta_c[start:end].shape)
+                    tmp[p, :self.J[p]] = avg_antecedent_delta_c[start:end]
+                    start = end
+                    # tmp[q,:self.L[q]]
+                    
+                    
+                self.term_dict['antecedent_centers'] -= l_rate * tmp
+                
+                
+                
+
+                # adjust the array to match the self.term_dict
+                max_array_size = max(self.J.values())
+                tmp = np.empty((self.P, max_array_size))
+                tmp[:] = np.nan
+                
+                start = 0
+                avg_antecedent_delta_widths = antecedent_delta_widths.mean(axis=0)
+                for p in range(self.P):
+                    end = start + self.J[p]
+                    # print(avg_consequent_delta_c[start:end])
+                    # print(avg_consequent_delta_c[start:end].shape)
+                    print(tmp.shape)
+                    print(avg_antecedent_delta_widths[start:end].shape)
+                    tmp[p, :self.J[p]] = avg_antecedent_delta_widths[start:end]
+                    start = end
+                    # tmp[q,:self.L[q]]
+                    
+                    
+                self.term_dict['antecedent_widths'] -= l_rate * tmp
+                
+                
                 
                 # init_rmse, _ = self.evaluate(batch_X, batch_Y)
                 
@@ -677,4 +812,4 @@ class SaFIN:
         print()
         
         est_Y = self.predict(shuffled_X)
-        return self.backpropagation(est_Y, shuffled_Y)
+        return rmse_before_prune

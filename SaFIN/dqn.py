@@ -132,9 +132,12 @@ class fuzzy_DQN_double(DQN):
         if len(memory) > 0:
             X = np.array([memory[i][0] for i in range(len(memory))])
             Y = self.predict(X).numpy()
-            size = int(np.round(X.shape[0] / 2))
+            # size = int(np.round(X.shape[0] / 2))
+            size = 500
+
+            if len(X) > size:
             # self.target.fit(X, Y, batch_size=min(size, 200), epochs=1, verbose=True, shuffle=False)
-            self.target.fit(X, Y, batch_size=int(np.round(X.shape[0] / 2)), epochs=1, verbose=True, shuffle=False)
+                self.target.fit(X, Y, batch_size=size, epochs=1, verbose=True, shuffle=False, rule_pruning=False)
         
     def replay(self, memory, size, gamma=1.0):
         ''' Add experience replay to the DQL network class.'''

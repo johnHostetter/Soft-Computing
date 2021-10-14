@@ -23,7 +23,7 @@ def main():
     test_X = boston.data[NUM_DATA:]
     test_Y = np.array([boston.target]).T[NUM_DATA:]
     safin = SaFIN(alpha=0.2, beta=0.6)
-    c_c_delta, c_w_delta = safin.fit(train_X, train_Y, batch_size=50, epochs=10, verbose=False, rule_pruning=False)
+    _ = safin.fit(train_X, train_Y, batch_size=50, epochs=10, verbose=False, rule_pruning=False)
     
     # init_rmse, _ = safin.evaluate(train_X, train_Y)
     
