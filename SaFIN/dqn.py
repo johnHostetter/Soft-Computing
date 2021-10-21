@@ -22,7 +22,7 @@ try:
     from SaFIN.safin import SaFIN
 except ImportError:
     from safin import SaFIN
-    
+
 class DQN():
     ''' Deep Q Neural Network class. '''
     def __init__(self, state_dim, action_dim, hidden_dim=64, lr=0.05):

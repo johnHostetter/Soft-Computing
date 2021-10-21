@@ -6,6 +6,9 @@ Created on Sat Oct  9 21:56:59 2021
 @author: john
 """
 
+# https://towardsdatascience.com/deep-q-learning-for-the-cartpole-44d761085c2f
+
+import os
 import gym
 import time
 import copy
@@ -18,6 +21,14 @@ try:
     from SaFIN.safin import SaFIN
 except ImportError:
     from safin import SaFIN
+    
+# seed 10 worked very well (solved), 11, 12, 14 did not work at all (not solved)
+# seed 13 worked okay but then got suboptimal (~65.61)
+SEED = 10
+os.environ['PYTHONHASHSEED']=str(SEED)
+torch.manual_seed(SEED)
+random.seed(SEED)
+np.random.seed(SEED)
 # from torch.autograd import Variable
 # import random
 # from PIL import Image
@@ -26,16 +37,19 @@ except ImportError:
 # # import torchvision.transforms as T
 # import numpy as np
 
-def play_model(env, model, episodes, gamma=0.9, 
+def play_cart_pole(env, model, num_episodes, gamma=0.9, 
                title = 'DQL', verbose=True):
     global FUZZY
     """Deep Q Learning algorithm using the DQN. """
+    
     final = []
-    memory = []
-    episode_i=0
-    for episode in range(episodes):
-        episode_i+=1
-        
+    episode_i = 0
+    episodes = []
+    
+    for episode in range(num_episodes):
+        episode_i += 1
+        memory = []
+
         # Reset state
         state = env.reset()
         done = False
@@ -61,19 +75,19 @@ def play_model(env, model, episodes, gamma=0.9,
         
         memory.append((state, action, next_state, reward, done))
         final.append(total)
-        plot_res(final, title)
+        episodes.append({'trajectory':memory, 'cummulative reward':total})
+        plot_results(final, title)
         
         if verbose:
             print("episode: {}, total reward: {}".format(episode_i, total))
             
-    return final, memory
+    return episodes, memory, final
 
-def random_search(env, episodes, 
-                  title='Random Strategy'):
+def random_search_cart_pole(env, num_episodes, title='Random Strategy'):
     """ Random search strategy implementation."""
     final = []
     memory = []
-    for episode in range(episodes):
+    for episode in range(num_episodes):
         state = env.reset()
         done = False
         total = 0
@@ -91,10 +105,10 @@ def random_search(env, episodes,
                 break
         # Add to the final reward
         final.append(total)
-        plot_res(final,title)
+        plot_results(final,title)
     return memory, final
 
-def plot_res(values, title=''):   
+def plot_results(values, title=''):   
     ''' Plot the reward curve and histogram of results over time.'''
     # Update the window after each episode
     # clear_output(wait=True)
@@ -124,30 +138,30 @@ def plot_res(values, title=''):
     ax[1].legend()
     plt.show()
 
-
-model = SaFIN(alpha=0.2, beta=0.6)
-env = gym.make('CartPole-v1')
-
-def q_learning(env, model, episodes, gamma=0.9, 
+def q_learning(env, model, num_episodes, gamma=0.9, 
                epsilon=0.3, eps_decay=0.99,
                replay=False, replay_size=20, 
                title = 'DQL', double=False, 
                n_update=10, soft=False, verbose=True):
     global FUZZY
     """Deep Q Learning algorithm using the DQN. """
+    
     final = []
     memory = []
-    episode_i=0
+    episodes = []
     sum_total_replay_time=0
-    for episode in range(episodes):
-        episode_i+=1
+    
+    for episode_idx in range(num_episodes):
+        episode = []
+        
         if double and not soft:
             # Update target network every n_update steps
-            if episode % n_update == 0:
+            if episode_idx % n_update == 0:
                 if FUZZY:
                     model.target_update(memory)
                 else:
                     model.target_update(None)
+                    
         if double and soft:
             model.target_update()
         
@@ -170,6 +184,7 @@ def q_learning(env, model, episodes, gamma=0.9,
             # Update total and memory
             total += reward
             memory.append((state, action, next_state, reward, done))
+            episode.append(memory[-1])
             q_values = model.predict(state).tolist()
              
             if done:
@@ -177,6 +192,10 @@ def q_learning(env, model, episodes, gamma=0.9,
                     q_values[action] = reward
                     # Update network weights
                     model.update(state, q_values)
+                # elif replay:
+                #     # my own addition
+                #     if model.model.K > 200:
+                #         model.simplify(memory, replay_size, gamma)
                 break
 
             if replay:
@@ -194,32 +213,56 @@ def q_learning(env, model, episodes, gamma=0.9,
             state = next_state
         
         # Update epsilon
-        epsilon = max(epsilon * eps_decay, 0.01)
+        epsilon = max(epsilon * eps_decay, 0.05)
         final.append(total)
-        plot_res(final, title)
-        
+        # memory.append({'trajectory':memory, 'cummulative reward':total})
+        episodes.append(episode)
+        plot_results(final, title)
+                
         if verbose:
-            print("episode: {}, total reward: {}".format(episode_i, total))
+            print("episode: {}, total reward: {}".format((episode_idx + 1), total))
             if replay:
-                print("Average replay time:", sum_total_replay_time/episode_i)
+                print("Average replay time:", sum_total_replay_time / (episode_idx + 1))
+                
+            if total == 500:
+                print('Maximum total reward reached. Terminate further Q-learning.')
+                break
         
-    return final, memory
+    return episodes, memory, final
+
+env = gym.make('CartPole-v1')
+env.seed(SEED)
+env.action_space.seed(SEED)
 
 # Number of states
 n_state = env.observation_space.shape[0]
 # Number of actions
 n_action = env.action_space.n
 # Number of episodes
-episodes = 200
+episodes = 160
 # Number of hidden nodes in the DQN
 n_hidden = 50
 # Learning rate
 lr = 0.001
 
+from fdqn import FuzzyDQN, FuzzyDQN_replay
 
+# fuzzy_dqn = FuzzyDQN()
+# episodes, memory, _ =  q_learning(env, fuzzy_dqn, 160, gamma=.95, 
+#                               epsilon=0.5, replay=False, double=False, 
+#                               title='A Self Organizing, Adaptive, Mamdani Neuro-Fuzzy Q-Network for Discrete Action', 
+#                               n_update=5)
+
+# Get replay results
+fdqn_replay = FuzzyDQN_replay(env)
+replay = q_learning(env, fdqn_replay, episodes, gamma=.999, epsilon=0.5, replay=True, replay_size=64,
+                    title='A Self Organizing, Adaptive, Mamdani Neuro-Fuzzy Q-Network for Discrete Action + Replay')
+
+quit
 
 # Get DQN results
 from dqn import DQN, DQN_replay, DQN_double, fuzzy_DQN_double, DQN_replay_w_distill, DQN_double_distill
+
 # simple_dqn = DQN(n_state, n_action, n_hidden, lr)
 # simple = q_learning(env, simple_dqn, episodes, gamma=.9, epsilon=0.3)
 
@@ -238,121 +281,34 @@ from dqn import DQN, DQN_replay, DQN_double, fuzzy_DQN_double, DQN_replay_w_dist
 #                     title='Double DQL with Replay', n_update=10)
 
 # Get fuzzy double DQN replay results
-FUZZY = True
-fuzzy_dqn_double = fuzzy_DQN_double(n_state, n_action, n_hidden, lr)
-fuzzy_double =  q_learning(env, fuzzy_dqn_double, episodes, gamma=.95, 
-                    epsilon=0.5, replay=True, double=True,
-                    title='Fuzzy Double DQL with Replay', n_update=5)
+# FUZZY = True
+# fuzzy_dqn_double = fuzzy_DQN_double(n_state, n_action, n_hidden, lr)
+# fuzzy_double =  q_learning(env, fuzzy_dqn_double, episodes, gamma=.95, 
+#                     epsilon=0.5, replay=True, double=True,
+#                     title='Fuzzy Double DQL with Replay', n_update=5)
 
-# # DQN + replay + online policy distillation
-# teachers = []
-# students = []
-# for i in range(1):
-#     FUZZY = True
-#     ddqn_replay_w_distill= DQN_double_distill(n_state, n_action, n_hidden, lr)
-#     student, memory =  q_learning(env, ddqn_replay_w_distill, episodes, gamma=.95, 
-#                         epsilon=0.5, replay=True, double=True,
-#                         title='DDQL with Replay + policy distillation', n_update=5)
+# DQN + replay + offline policy distillation
+for i in range(1):
+    FUZZY = True
+    ddqn_replay = DQN_double(n_state, n_action, n_hidden, lr)
+    episodes, memory, _ =  q_learning(env, ddqn_replay, episodes, gamma=.95, 
+                                  epsilon=0.5, replay=True, double=True, 
+                                  title='DDQL with Replay + policy distillation', n_update=5)
     
-#     teacher, memories = play_model(env, ddqn_replay_w_distill, 10, title='Deep Q-Network (Teacher) + Replay')
-#     # try:
-#     ddqn_replay_w_distill.policy_distillation(memory)
-#     student, _ = play_model(env, ddqn_replay_w_distill.student, 30, title='SaFIN (Student) Q-Network')
-#     teachers.append(teacher)
-#     students.append(student)
-#     # except ValueError: # line 348: ValueError: operands could not be broadcast together with shapes (500,2,5) (6,) 
-#     #     continue
+    _, _, _ = play_cart_pole(env, ddqn_replay, 10, title='Deep Q-Network (Teacher) + Replay')
 
-# X = np.array([memories[i][0] for i in range(len(memories))])
-# Y = dqn_double.predict(X).numpy()
-# safin = SaFIN(0.01, 0.95)
-# safin.fit(X, Y, batch_size=1000)
-# play_model(env, fuzzy_dqn_double, 30)
+    safin = SaFIN(0.3, 0.7)
+    
+    # train the student model after replay with memory
+    limited_memory = memory[-4000:]
+    # limited_memory = memory
+    X = np.array([limited_memory[i][0] for i in range(len(limited_memory))])
+    Y = ddqn_replay.predict(X).numpy()
+    # Y = (Y - Y.min()) / (Y.max() - Y.min()) # try normalizing the Q values; this worked 500+, and okay the one time ~150
+    # Y = Y - Y.mean() / (Y.max() - Y.min()) # try standardizing the Q values; this worked 500+, and okay the one time ~150
 
-# def fuzzy_q_learning(env, model, episodes, gamma=0.9, 
-#                epsilon=0.3, eps_decay=0.99,
-#                replay=False, replay_size=20, 
-#                title = 'SAFQL', double=False, 
-#                n_update=10, soft=False, verbose=True):
-#     """Deep Q Learning algorithm using the DQN. """
-#     final = []
-#     memory = []
-#     episode_i=0
-#     sum_total_replay_time=0
-#     for episode in range(episodes):
-#         episode_i+=1
-        
-#         # Reset state
-#         state = env.reset()
-#         done = False
-#         total = 0
-        
-#         while not done:
-#             # Implement greedy search policy to explore the state space
-#             if random.random() < epsilon:
-#                 action = env.action_space.sample()
-#             elif len(model.rules) == 0:
-#                 action = env.action_space.sample()
-#             else:
-#                 q_values = model.predict(state)
-#                 action = np.argmax(q_values)
-            
-#             # Take action and add reward to total
-#             next_state, reward, done, _ = env.step(action)
-            
-#             # Update total and memory
-#             total += reward
-#             memory.append((state, action, next_state, reward, done))
-            
-#             if len(model.rules) == 0:
-#                 q_values = np.array([0.0] * env.action_space.n)
-#                 q_values[action] = reward
-#                 q_values = np.reshape(q_values, (1, env.action_space.n))
-#             else:
-#                 q_values = model.predict(state).tolist()
-             
-#             if done:
-#                 if not replay:
-#                     q_values[0][int(action)] = reward
-#                     # Update network weights
-#                     state = np.reshape(state, (1, state.shape[0]))
-#                     model.fit(state, np.array(q_values), rule_pruning=False)
-#                 break
-
-#             # Update network weights using the last step only
-#             if len(model.rules) == 0:
-#                 q_values_next = np.array([0.0] * env.action_space.n)
-#                 q_values_next = np.reshape(q_values, (1, env.action_space.n))
-#             else:
-#                 q_values_next = model.predict(next_state)
-            
-#             try:
-#                 q_values[0][action] = reward + gamma * np.max(q_values_next)
-#             except IndexError:
-#                 print('q %s' % q_values)
-#                 print('ac %s ' % action)
-#             try:
-#                 state = np.reshape(state, (1, state.shape[0]))
-#             except ValueError:
-#                 print(state)
-#             try:
-#                 q_values = np.reshape(q_values, (1, env.action_space.n))
-#             except ValueError:
-#                 print(q_values)
-#             model.fit(state, q_values, rule_pruning=False)
-
-#             state = next_state
-        
-#         # Update epsilon
-#         epsilon = max(epsilon * eps_decay, 0.01)
-#         final.append(total)
-#         plot_res(final, title)
-        
-#         if verbose:
-#             print("episode: {}, total reward: {}".format(episode_i, total))
-#             if replay:
-#                 print("Average replay time:", sum_total_replay_time/episode_i)
-        
-#     return final
-
-# fuzzy_q_learning(env, model, 100)
+    size = int(np.round(X.shape[0] / 2))
+    size = 500
+    safin.fit(X, Y, batch_size=size, epochs=10, verbose=True, shuffle=True, rule_pruning=False)
+    
+    _, _, _ = play_cart_pole(env, safin, 30, title='SaFIN (Student) Q-Network')

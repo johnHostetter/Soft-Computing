@@ -81,7 +81,11 @@ def genetic_algorithm(objective, probabilities, n_bits, n_iter, n_pop, r_cross, 
     # weighted population
     population = []
     for _ in range(n_pop):
-        population.append([np.random.choice(np.arange(0, 2), p=probabilities[i]) for i in range(n_bits)])
+        generate_new_candidate = True
+        while generate_new_candidate:
+            candidate = [np.random.choice(np.arange(0, 2), p=probabilities[i]) for i in range(n_bits)]
+            generate_new_candidate = (np.array(candidate) == 0).all()
+        population.append(candidate)
     # keep track of best solution
     best, best_eval = 0, objective(population[0])
     best = population[best] # get the 0'th candidate if there is no best result from generations
