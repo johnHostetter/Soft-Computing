@@ -57,7 +57,7 @@ def play_cart_pole(env, model, num_episodes, gamma=0.9,
         
         while not done:
             try:
-                q_values = model.predict(state[np.newaxis, :])
+                q_values = model.predict([state])
                 action = np.argmax(q_values)
                 # Take action and add reward to total
                 next_state, reward, done, _ = env.step(action)
@@ -86,7 +86,6 @@ def play_cart_pole(env, model, num_episodes, gamma=0.9,
 def random_search_cart_pole(env, num_episodes, title='Random Strategy'):
     """ Random search strategy implementation."""
     final = []
-    states = []
     memory = []
     for episode in range(num_episodes):
         state = env.reset()
@@ -100,15 +99,14 @@ def random_search_cart_pole(env, num_episodes, title='Random Strategy'):
             # Update reward
             total += reward
             memory.append((state, action, next_state, reward, done))
-            states.append(state)
+
             if done:
                 memory.append((state, action, next_state, reward, done))
-                states.append(next_state)
                 break
         # Add to the final reward
         final.append(total)
         plot_results(final,title)
-    return memory, final, states
+    return memory, final
 
 def plot_results(values, title=''):   
     ''' Plot the reward curve and histogram of results over time.'''
@@ -144,12 +142,12 @@ def q_learning(env, model, num_episodes, gamma=0.9,
                epsilon=0.3, eps_decay=0.99,
                replay=False, replay_size=20, 
                title = 'DQL', double=False, 
-               n_update=10, soft=False, verbose=True, memory=[]):
+               n_update=10, soft=False, verbose=True):
     global FUZZY
     """Deep Q Learning algorithm using the DQN. """
     
     final = []
-    # memory = []
+    memory = []
     episodes = []
     sum_total_replay_time=0
     
@@ -241,7 +239,7 @@ n_state = env.observation_space.shape[0]
 # Number of actions
 n_action = env.action_space.n
 # Number of episodes
-episodes = 200
+episodes = 160
 # Number of hidden nodes in the DQN
 n_hidden = 50
 # Learning rate
@@ -256,14 +254,9 @@ from fdqn import FuzzyDQN, FuzzyDQN_replay
 #                               n_update=5)
 
 # Get replay results
-mem, _, states = random_search_cart_pole(env, 10)
-states = np.array(states)
-X_mins = states.min(axis=0)
-X_maxes = states.max(axis=0)
-fdqn_replay = FuzzyDQN_replay(env, X_mins, X_maxes)
-replay = q_learning(env, fdqn_replay, episodes, gamma=.999, epsilon=0.99, replay=True, replay_size=20,
-                    title='A Self Organizing, Adaptive, Mamdani Neuro-Fuzzy Q-Network for Discrete Action + Replay', memory=mem)
-_, _, scores = play_cart_pole(env, fdqn_replay, 30, title='Fuzzy Q-Network + Replay')
+fdqn_replay = FuzzyDQN_replay(env)
+replay = q_learning(env, fdqn_replay, episodes, gamma=.999, epsilon=0.5, replay=True, replay_size=64,
+                    title='A Self Organizing, Adaptive, Mamdani Neuro-Fuzzy Q-Network for Discrete Action + Replay')
 
 quit
 

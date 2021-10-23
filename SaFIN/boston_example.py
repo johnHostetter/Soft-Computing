@@ -110,7 +110,7 @@ def main():
     #         # fnn.term_dict['antecedent_centers'] += l_rate * (deltas['a_c'] / len(train_X))
     #         # fnn.term_dict['antecedent_widths'] += l_rate * (deltas['a_w'] / len(train_X))
     
-    rmse, _ = safin.evaluate(test_X, test_Y)
+    rmse = safin.evaluate(test_X, test_Y)
     print('Test RMSE = %.6f' % rmse)
     return safin
 

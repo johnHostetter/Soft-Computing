@@ -19,7 +19,7 @@ def objective(rule_indices, model, X, Y):
     end = time.time()
     tmp = deepcopy(model)
     tmp.rule_selection(rule_indices)
-    rmse, adj_rmse = tmp.evaluate(X, Y)
+    rmse = tmp.evaluate(X, Y)
     cfs = [rule['CF'] for rule in tmp.rules]
     # return rmse * tmp.K * (-1*(np.sum(tmp.weights) + np.sum(cfs)))
     # t = end - np.array([rule['time_added'] for rule in tmp.rules]).min()
@@ -29,17 +29,18 @@ def objective(rule_indices, model, X, Y):
     W1 = 1e3
     WEIGHT = 1e1
     print('rmse %s' % rmse)
-    print('adj. rmse %s' % adj_rmse)
+    # print('adj. rmse %s' % adj_rmse)
     print('rules %s' % (WEIGHT * (tmp.K / DESIRED_RULES)))
     print('cfs %s' % (1 - np.mean(cfs)))
-    if adj_rmse is None:
-        return rmse
-    else:
-        if adj_rmse == 0:
-            print('wait')
-            return rmse
-        return adj_rmse
-        return (W1 * adj_rmse) * (WEIGHT * (tmp.K / DESIRED_RULES)) * (1/(np.sum(tmp.weights))) * (1 - np.min(cfs))
+    return rmse
+    # if adj_rmse is None:
+    #     return rmse
+    # else:
+    #     if adj_rmse == 0:
+    #         print('wait')
+    #         return rmse
+    #     return adj_rmse
+    #     return (W1 * adj_rmse) * (WEIGHT * (tmp.K / DESIRED_RULES)) * (1/(np.sum(tmp.weights))) * (1 - np.min(cfs))
     #     return adj_rmse * (1 - np.mean(cfs))
     # return (W1 * adj_rmse) * (WEIGHT * (tmp.K / DESIRED_RULES)) * (1/(np.sum(tmp.weights))) * (1 - np.min(cfs))
 
