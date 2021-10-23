@@ -78,8 +78,9 @@ class Model(object):
             else:
                 action_index = random.randint(0, self.action_set_length - 1)
             try:
-                action_set = [-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0 ,1,2,3,4,5,6,7,8,9,10]
-                action_index = list.index(action_set, a)
+                # action_set = [-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0 ,1,2,3,4,5,6,7,8,9,10]
+                # action_index = list.index(action_set, a)
+                action_index = a
                 self.M.append(action_index)
             except UnboundLocalError:
                 print('UnboundLocalError.')
@@ -142,6 +143,17 @@ class Model(object):
         self.CalculateTruthValue(state)
         self.CalculateStateValue()
         self.CalculateQualityVariation(reward)
+        self.UpdateqValue()
+        self.ActionSelection()
+        action = self.InferredAction()
+        self.CalculateQValue()
+        self.KeepStateHistory()
+        return action
+    
+    def no_learn_run(self, state, reward):
+        self.CalculateTruthValue(state)
+        self.CalculateStateValue()
+        # self.CalculateQualityVariation(reward)
         self.UpdateqValue()
         self.ActionSelection()
         action = self.InferredAction()
