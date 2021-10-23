@@ -47,7 +47,7 @@ class SaFIN:
         $K$: number of fuzzy rules
         $R_{k}$: $k$th fuzzy rule
     """
-    def __init__(self, alpha=0.2, beta=0.6, X_mins=None, X_maxes=None):
+    def __init__(self, alpha=0.2, beta=0.6, problem_type='SL', X_mins=None, X_maxes=None):
         """
         
 
@@ -72,9 +72,16 @@ class SaFIN:
         self.P = None
         self.Q = None
         self.K = 0
-        if X_mins is not None and X_maxes is not None:
-            self.X_mins = X_mins
-            self.X_maxes = X_maxes
+        
+        self.problem_type = problem_type
+        
+        self.X_mins = X_mins
+        self.X_maxes = X_maxes
+        # self.X_mins = None
+        # self.X_maxes = None
+        # if X_mins is not None and X_maxes is not None:
+        #     self.X_mins = X_mins
+        #     self.X_maxes = X_maxes
         
     def __deepcopy__(self, memo):
         rules = deepcopy(self.rules)
@@ -375,7 +382,7 @@ class SaFIN:
         self.o5 = self.output_layer(self.o4)
         return self.o5
     
-    def predict(self, X):
+    def predict(self, X, verbose=False, rule_check=True):
         """
         Generates output predictions for the input samples.
         
@@ -395,6 +402,66 @@ class SaFIN:
             where N is the number of observations, and Q is the number of output features.
 
         """
+        if self.problem_type == 'RL' and rule_check:
+            if self.X_mins is None and self.X_maxes is None:
+                self.X_mins = X[0]
+                self.X_maxes = X[0]
+                if self.X_mins == X[0]:
+                    exit
+                X_mins = self.X_mins
+                X_maxes = self.X_maxes
+            else:
+                X_mins = X.min(axis=0)
+                X_maxes = X.max(axis=0)
+                self.X_mins = np.minimum(self.X_mins, X_mins)
+                self.X_maxes = np.minimum(self.X_maxes, X_maxes)
+                
+            Y = np.array([[0.0] * self.Q])
+            if X.ndim == 1:
+                X = X[np.newaxis, :]
+                
+            self.antecedents = CLIP(X, Y, X_mins, X_maxes, 
+                                    self.antecedents, alpha=self.alpha, beta=self.beta)
+            
+            if len(self.consequents) == 0:
+                for q in range(self.Q):
+                    self.consequents.append([])
+            
+            if verbose:
+                print('Step 1: Creating/updating the fuzzy logic rules...')
+            start = time.time()
+            
+            self.antecedents, self.consequents, self.rules, self.weights = rule_creation(X, Y, 
+                                                                                         self.antecedents, 
+                                                                                         self.consequents, 
+                                                                                         self.rules, 
+                                                                                         self.weights,
+                                                                                         self.problem_type,
+                                                                                         self)
+            K = len(self.rules)
+            end = time.time()
+            if verbose:
+                print('%d fuzzy logic rules created/updated in %.2f seconds.' % (K, end - start))
+            
+            if verbose:
+                consequences = [self.rules[idx]['C'][0] for idx in range(K)]
+                print('\n--- Distribution of Consequents ---')
+                print(np.unique(consequences, return_counts=True))
+                print()
+                del consequences
+            
+            self.preprocessing()
+            
+            # add or update the antecedents, consequents and rules
+            if verbose:
+                print('Step 3: Creating/updating the neuro-fuzzy network...')
+            start = time.time()
+            self.update()
+            # self.update(term_dict, antecedents_indices_for_each_rule, consequents_indices_for_each_rule)
+            end = time.time()
+            if verbose:
+                print('Neuro-fuzzy network created/updated in %.2f seconds' % (end - start))
+                print()
         return self.feedforward(X)
     
     def evaluate(self, X, Y):
@@ -423,8 +490,9 @@ class SaFIN:
         # (1) calculating the error signal in the output layer
         
         e5_m = y - self.o5 # y actual minus y predicted
-        e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node
-        error = (self.o4 * e5)
+        # e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node, shape is (num of observations, num of output nodes)
+        e5 = np.multiply(e5_m[:,:,np.newaxis], self.W_4.T) # shape is (num of observations, num of output nodes, num of output terms)
+        error = (self.o4 * e5.sum(axis=1))
         
         # delta centers
         flat_centers = self.term_dict['consequent_centers'].flatten()
@@ -435,8 +503,8 @@ class SaFIN:
         # numerator = (widths * y4_k)
         widths = np.multiply(flat_widths[:,np.newaxis], self.W_4).T
         num = np.multiply(widths[np.newaxis,:,:], self.o4[:, np.newaxis,:])
-        den = num.sum(axis=2)
-        consequent_delta_c = (num / den[:, :, np.newaxis]).sum(axis=1)
+        den = np.power(num.sum(axis=2), 2)
+        consequent_delta_c = e5.sum(axis=1) * (num / den[:, :, np.newaxis]).sum(axis=1)
         
         # delta widths
         c_lk = (flat_centers * self.W_4.T)
@@ -449,6 +517,29 @@ class SaFIN:
         compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
         division = (compatible_numerator / denominator[:, :, np.newaxis])
         consequent_delta_widths = division.sum(axis=1)
+        
+        # between consequents and outputs
+        tmp = np.zeros((x.shape[0], self.Q, self.total_consequents)) # should be the same shape as self.W_4.T, but it is (num of observations, num of output nodes, num of output terms)
+        # start_idx = 0
+        # for q in range(self.Q):
+        #     end_idx = start_idx + self.L[q]
+        #     W_4[start_idx:end_idx, q] = 1
+        #     start_idx = end_idx
+        
+        y_lk = np.swapaxes(self.o4[:,:,np.newaxis] * self.W_4, 1, 2) # shape is (num of observations, num of output nodes, num of output terms)
+        c_lk = np.multiply(flat_centers[:,np.newaxis], self.W_4).T
+        lhs_term = (y_lk * widths[np.newaxis,:,:])
+        rhs_term = (y_lk * widths[np.newaxis,:,:] * c_lk[np.newaxis,:,:])
+        for q in range(self.Q): # iterate over the output nodes
+            for k in range(self.total_consequents): # iterate over their terms
+                if self.W_4.T[q, k] == 1:
+                    val = ((y_lk[:, q, k])[:,np.newaxis] * ((c_lk[q, k] * lhs_term.sum(axis=2)) - rhs_term.sum(axis=2)))
+                    val /= np.power(lhs_term.sum(axis=2), 2)
+                    tmp[:, q, k] = val[:, q]
+                    
+        consequent_delta_widths = e5.sum(axis=1) * tmp.sum(axis=1)
+        
+        return consequent_delta_c, consequent_delta_widths
         
         # layer 4 error signal
         numerator = (flat_widths * difference)
@@ -504,7 +595,7 @@ class SaFIN:
         
         return consequent_delta_c, consequent_delta_widths, antecedent_delta_c, antecedent_delta_widths
     
-    def fit(self, X, Y, batch_size=None, epochs=1, verbose=False, shuffle=True, rule_pruning=True, problem_type='SL'):
+    def fit(self, X, Y, batch_size=None, epochs=1, l_rate=0.001, verbose=False, shuffle=True, rule_pruning=True, gradient_descent=True):
         if self.P is None:
             self.P = X.shape[1]
         if self.Q is None:
@@ -524,9 +615,20 @@ class SaFIN:
                 print('--- Epoch %d; Batch %d ---' % (epoch + 1, i + 1))
                 batch_X = X[batch_size*i:batch_size*(i+1)]
                 batch_Y = Y[batch_size*i:batch_size*(i+1)]
-                if self.X_mins is not None and self.X_maxes is not None:
+                if self.problem_type == 'RL':
+                    if self.X_mins is None and self.X_maxes is None:
+                        self.X_mins = X[0]
+                        self.X_maxes = X[0]
+                    else:
+                        X_mins = X.min(axis=0)
+                        X_maxes = X.max(axis=0)
+                        self.X_mins = np.minimum(self.X_mins, X_mins)
+                        self.X_maxes = np.minimum(self.X_maxes, X_maxes)
                     X_mins = self.X_mins
                     X_maxes = self.X_maxes
+                # if self.X_mins is not None and self.X_maxes is not None:
+                #     X_mins = self.X_mins
+                #     X_maxes = self.X_maxes
                 else:
                     X_mins = np.min(batch_X, axis=0)
                     X_maxes = np.max(batch_X, axis=0)
@@ -543,10 +645,10 @@ class SaFIN:
                 self.antecedents = CLIP(batch_X, batch_Y, X_mins, X_maxes, 
                                         self.antecedents, alpha=self.alpha, beta=self.beta)
                 
-                if problem_type == 'SL':
+                if self.problem_type == 'SL':
                     self.consequents = CLIP(batch_Y, batch_X, Y_mins, Y_maxes, 
                                             self.consequents, alpha=self.alpha, beta=self.beta)
-                elif problem_type == 'RL':
+                elif self.problem_type == 'RL':
                     if len(self.consequents) == 0:
                         for q in range(self.Q):
                             self.consequents.append([])
@@ -559,7 +661,8 @@ class SaFIN:
                                                                                              self.consequents, 
                                                                                              self.rules, 
                                                                                              self.weights,
-                                                                                             problem_type)
+                                                                                             self.problem_type,
+                                                                                             self)
                 K = len(self.rules)
                 end = time.time()
                 if verbose:
@@ -594,68 +697,75 @@ class SaFIN:
                     rmse_after_prune, _ = self.evaluate(batch_X, batch_Y) # we need to update the stored values e.g. self.o4
                 print()
                 
-                l_rate = 0.05
-                # l_rate = 0.001
-                consequent_delta_c, consequent_delta_widths, antecedent_delta_centers, antecedent_delta_widths = self.backpropagation(batch_X, batch_Y)
-                
-                # self.term_dict['consequent_centers'] -= l_rate * np.reshape(consequent_delta_c.mean(axis=0), self.term_dict['consequent_centers'].shape)
-                # adjust the array to match the self.term_dict
-                max_array_size = max(self.L.values())
-                tmp = np.empty((self.Q, max_array_size))
-                tmp[:] = np.nan
-                
-                start = 0
-                avg_consequent_delta_c = consequent_delta_c.mean(axis=0)
-                for q in range(self.Q):
-                    end = start + self.L[q]
-                    tmp[q, :self.L[q]] = avg_consequent_delta_c[start:end]
-                    start = end                    
-                    
-                self.term_dict['consequent_centers'] -= l_rate * tmp
-                    
-                # adjust the array to match the self.term_dict
-                max_array_size = max(self.L.values())
-                tmp = np.empty((self.Q, max_array_size))
-                tmp[:] = np.nan
-                
-                start = 0
-                avg_consequent_delta_widths = consequent_delta_widths.mean(axis=0)
-                for q in range(self.Q):
-                    end = start + self.L[q]
-                    tmp[q, :self.L[q]] = avg_consequent_delta_widths[start:end]
-                    start = end                    
-                    
-                self.term_dict['consequent_widths'] -= l_rate * tmp
+                if gradient_descent:
+                    if self.K > 1:
+                        print('wait')
+                    # consequent_delta_c, consequent_delta_widths, antecedent_delta_centers, antecedent_delta_widths = self.backpropagation(batch_X, batch_Y)
 
-                # ANTECEDENTS
-                
-                # adjust the array to match the self.term_dict
-                max_array_size = max(self.J.values())
-                tmp = np.empty((self.P, max_array_size))
-                tmp[:] = np.nan
-                
-                start = 0
-                avg_antecedent_delta_c = antecedent_delta_centers.mean(axis=0)
-                for p in range(self.P):
-                    end = start + self.J[p]
-                    tmp[p, :self.J[p]] = avg_antecedent_delta_c[start:end]
-                    start = end                    
+                    consequent_delta_c, consequent_delta_widths = self.backpropagation(batch_X, batch_Y)
                     
-                self.term_dict['antecedent_centers'] -= l_rate * tmp
-
-                # adjust the array to match the self.term_dict
-                max_array_size = max(self.J.values())
-                tmp = np.empty((self.P, max_array_size))
-                tmp[:] = np.nan
-                
-                start = 0
-                avg_antecedent_delta_widths = antecedent_delta_widths.mean(axis=0)
-                for p in range(self.P):
-                    end = start + self.J[p]
-                    tmp[p, :self.J[p]] = avg_antecedent_delta_widths[start:end]
-                    start = end                    
+                    # self.term_dict['consequent_centers'] -= l_rate * np.reshape(consequent_delta_c.mean(axis=0), self.term_dict['consequent_centers'].shape)
+                    # adjust the array to match the self.term_dict
+                    max_array_size = max(self.L.values())
+                    tmp = np.empty((self.Q, max_array_size))
+                    tmp[:] = np.nan
                     
-                self.term_dict['antecedent_widths'] -= l_rate * tmp
+                    start = 0
+                    avg_consequent_delta_c = consequent_delta_c.mean(axis=0)
+                    for q in range(self.Q):
+                        end = start + self.L[q]
+                        tmp[q, :self.L[q]] = avg_consequent_delta_c[start:end]
+                        start = end                    
+                        
+                    self.term_dict['consequent_centers'] += l_rate * tmp
+                    
+                    print(tmp)
+                    print('c')
+                    print(self.term_dict['consequent_centers'])
+                        
+                    # adjust the array to match the self.term_dict
+                    max_array_size = max(self.L.values())
+                    tmp = np.empty((self.Q, max_array_size))
+                    tmp[:] = np.nan
+                    
+                    start = 0
+                    avg_consequent_delta_widths = consequent_delta_widths.mean(axis=0)
+                    for q in range(self.Q):
+                        end = start + self.L[q]
+                        tmp[q, :self.L[q]] = avg_consequent_delta_widths[start:end]
+                        start = end                    
+                        
+                    self.term_dict['consequent_widths'] += 0 * tmp
+    
+                    # # ANTECEDENTS
+                    
+                    # # adjust the array to match the self.term_dict
+                    # max_array_size = max(self.J.values())
+                    # tmp = np.empty((self.P, max_array_size))
+                    # tmp[:] = np.nan
+                    
+                    # start = 0
+                    # avg_antecedent_delta_c = antecedent_delta_centers.mean(axis=0)
+                    # for p in range(self.P):
+                    #     end = start + self.J[p]
+                    #     tmp[p, :self.J[p]] = avg_antecedent_delta_c[start:end]
+                    #     start = end                    
+                        
+                    # self.term_dict['antecedent_centers'] -= l_rate * tmp
+    
+                    # # adjust the array to match the self.term_dict
+                    # max_array_size = max(self.J.values())
+                    # tmp = np.empty((self.P, max_array_size))
+                    # tmp[:] = np.nan
+                    
+                    # start = 0
+                    # avg_antecedent_delta_widths = antecedent_delta_widths.mean(axis=0)
+                    # for p in range(self.P):
+                    #     end = start + self.J[p]
+                    #     tmp[p, :self.J[p]] = avg_antecedent_delta_widths[start:end]
+                    #     start = end                    
+                        
+                    # self.term_dict['antecedent_widths'] -= l_rate * tmp
                 
             start = time.time()
             rmse_before_prune, _ = self.evaluate(shuffled_X, shuffled_Y)

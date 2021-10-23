@@ -16,7 +16,7 @@ def R(sigma_1, sigma_2):
     # regulator function
     return (1/2) * (sigma_1 + sigma_2)
 
-def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6):
+def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=0.0):
     antecedents = terms
     min_values_per_feature_in_X = mins
     max_values_per_feature_in_X = maxes
@@ -29,11 +29,9 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6):
                 c_1p = x[p]
                 min_p = min_values_per_feature_in_X[p]
                 max_p = max_values_per_feature_in_X[p]
-                left_width = np.sqrt(-1.0 * (np.power(min_p - x[p], 2) / np.log(alpha)))
-                right_width = np.sqrt(-1.0 * (np.power(max_p - x[p], 2) / np.log(alpha)))
+                left_width = np.sqrt(-1.0 * (np.power((min_p - theta) - x[p], 2) / np.log(alpha)))
+                right_width = np.sqrt(-1.0 * (np.power((max_p + theta) - x[p], 2) / np.log(alpha)))
                 sigma_1p = R(left_width, right_width)
-                # if len(X) == 1:
-                #     sigma_1p = 0.1
                 antecedents.append([{'center': c_1p, 'sigma': sigma_1p, 'support':1}])
         else:
             # calculate the similarity between the input and existing fuzzy clusters
@@ -111,7 +109,7 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6):
                     antecedents[p].append({'center':new_c, 'sigma':new_sigma, 'support':1})
     return antecedents
 
-def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_weights=[], problem_type='SL'):
+def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_weights=[], problem_type='SL', model=None):
     start = time.time()
     rules = existing_rules
     weights = existing_weights
@@ -146,12 +144,24 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[], existing_we
         elif problem_type == 'RL':       
             from copy import deepcopy
             C_star_qs = []
-            for q in range(Y.shape[1]):
-                import random
-                new_consequent = {'center':random.random(), 'sigma':random.random(), 'support':1}
-                consequents[q].append(new_consequent)
-                new_consequent_index = len(consequents[q]) - 1
-                C_star_qs.append(new_consequent_index)
+            if model.K > 0:
+                q_value_estimates = model.predict(x, rule_check=False)[0]
+                for q in range(q_value_estimates.shape[0]):
+                    import random
+                    # new_consequent = {'center':q_value_estimates[q], 'sigma':random.random(), 'support':1}
+                    new_consequent = {'center':random.uniform(-2, 2), 'sigma':random.random(), 'support':1}
+
+                    consequents[q].append(new_consequent)
+                    new_consequent_index = len(consequents[q]) - 1
+                    C_star_qs.append(new_consequent_index)
+            else:
+                for q in range(Y.shape[1]):
+                    import random
+                    new_consequent = {'center':random.uniform(-2, 2), 'sigma':random.random(), 'support':1}
+                    # new_consequent = {'center':0.0, 'sigma':1.0, 'support':1}
+                    consequents[q].append(new_consequent)
+                    new_consequent_index = len(consequents[q]) - 1
+                    C_star_qs.append(new_consequent_index)
             R_star = {'A':A_star_js, 'C':C_star_qs, 'CF': CF, 'time_added': start}
         
         if not rules:
