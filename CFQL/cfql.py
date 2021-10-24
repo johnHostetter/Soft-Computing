@@ -63,27 +63,28 @@ def get_tensors(list_of_tensors, list_of_indices):
     return s, a, ns, r
 
 class CFQLModel(object):
-    def __init__(self, gamma, alpha, ee_rate,
+    def __init__(self, gamma, l_rate, ee_rate,
                  action_set_length, fis=Build()):
-        self.R = []
-        self.R_ = []
-        self.M = []
-        self.V = []
-        self.Q = []
-        self.Error = 0
-        self.gamma = gamma
-        self.alpha = alpha
+        self.current_rule_activations = []
+        self.past_rule_activations = []
+        self.each_rules_chosen_action = []
+        self.state_values = []
+        self.state_Qs = []
+        self.error = 0
+        self.gamma = gamma # discount factor
+        self.l_rate = l_rate # learning rate
         self.ee_rate = ee_rate
+        self.exploration_exploitation_rate = ee_rate # higher values result in more exploration
         self.action_set_length = action_set_length
         self.fis = fis
 
         self.network = TabularNetwork(self.fis.get_number_of_rules(),
                                  self.action_set_length)
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-1)
 
     # Fuzzify to get the degree of truth values
     def truth_value(self, state_value):
-        self.R = []
+        self.current_rule_activations = []
         L = []
         input_variables = self.fis.list_of_input_variable
         for index, variable in enumerate(input_variables):
@@ -97,16 +98,15 @@ class CFQLModel(object):
         # Calculate Truth Values
         # results are the product of membership functions
         for element in itertools.product(*L):
-            self.R.append(functools.reduce(operator.mul, element, 1))
-        return self
+            self.current_rule_activations.append(functools.reduce(operator.mul, element, 1))
 
     def action_selection(self):
-        self.M = []
+        self.each_rules_chosen_action = []
         r = random.uniform(0, 1)
 
         for rule_index in range(self.fis.get_number_of_rules()):
             # Act randomly
-            if r < self.ee_rate:
+            if r < self.exploration_exploitation_rate:
                 action_index = random.randint(0, self.action_set_length - 1)
             # Get maximum values
             else:
@@ -115,61 +115,72 @@ class CFQLModel(object):
                 q_values = self.network(state_tensor)
                 q_values = q_values.detach().numpy() # detach from PyTorch
                 action_index = np.argmax(q_values)
-            self.M.append(action_index)
+            self.each_rules_chosen_action.append(action_index)
 
         # 1. Action = sum of truth values*action selection
         # action = 0
-        # for index, val in enumerate(self.R):
-        #     action += self.M[index]*val
+        # for index, val in enumerate(self.current_rule_activations):
+        #     action += self.each_rules_chosen_action[index]*val
         # action = int(action)
         # if action >= self.action_set_length:
         #         action = self.action_set_length - 1
-        action = self.M[np.argmax(self.R)]
+        action = self.each_rules_chosen_action[np.argmax(self.current_rule_activations)]
+        return action
+    
+    def offline_action_selection(self, q_table, action_index):
+        self.each_rules_chosen_action = []
+        
+        for rule in q_table:
+            self.each_rules_chosen_action.append(action_index)
+        action = self.each_rules_chosen_action[np.argmax(self.current_rule_activations)]
         return action
 
     # Q(s,a) = Sum of (degree_of_truth_values[i]*q[i, a])
-    def calculate_q_value(self):
+    def calculate_q_value(self, q_table):
         q_curr = 0
-        for rule_index, truth_value in enumerate(self.R):
-            state = np.array([rule_index])
-            state_tensor = torch.tensor(state, dtype=torch.int64)
-            q_values = self.network(state_tensor)
-            q_values = q_values.detach().numpy() # detach from PyTorch
-            q_curr += truth_value * q_values[0, self.M[rule_index]]
-        self.Q.append(q_curr)
+        for rule_index, truth_value in enumerate(self.current_rule_activations):
+            # state = np.array([rule_index])
+            # state_tensor = torch.tensor(state, dtype=torch.int64)
+            # q_values = self.network(state_tensor)
+            # q_values = q_values.detach().numpy() # detach from PyTorch
+            q_curr += truth_value * q_table[0, self.each_rules_chosen_action[rule_index]]
+        self.state_Qs.append(q_curr)
+        return q_curr
 
     # V'(s) = sum of (degree of truth values*max(q[i, a]))
-    def calculate_state_value(self):
+    def calculate_state_value(self, q_table):
         # v_curr = 0
         # for index, rule in enumerate(self.q_table):
-        #     v_curr += (self.R[index] * max(rule))
-        # self.V.append(v_curr)
+        #     v_curr += (self.current_rule_activations[index] * max(rule))
+        # self.state_values.append(v_curr)
         v_curr = 0
         for rule_index in range(self.fis.get_number_of_rules()):
-            state = np.array([rule_index])
-            state_tensor = torch.tensor(state, dtype=torch.int64)
-            q_values = self.network(state_tensor)
-            q_values = q_values.detach().numpy() # detach from PyTorch
-            v_curr += (self.R[rule_index] * q_values.max())
-        self.V.append(v_curr)
+            # state = np.array([rule_index])
+            # state_tensor = torch.tensor(state, dtype=torch.int64)
+            # q_values = self.network(state_tensor)
+            # q_values = q_values.detach().numpy() # detach from PyTorch
+            q_values = q_table[rule_index]
+            v_curr += (self.current_rule_activations[rule_index] * q_values.max())
+        self.state_values.append(v_curr)
+        return v_curr
 
     # Q(i, a) += beta*degree_of_truth*delta_Q
     # delta_Q = reward + gamma*V'(s) - Q(s, a)
     def update_q_value(self, reward): # THIS STILL NEEDS UPDATED
-        self.Error = reward + self.gamma * self.V[-1] - self.Q[-1]
+        self.error = reward + self.gamma * self.state_values[-1] - self.state_Qs[-1]
         self.q_table = self.network(torch.arange(self.fis.get_number_of_rules())).detach().numpy()
-        # self.R_ is the degree of truth values for the previous state
-        for index, truth_value in enumerate(self.R_):
-            delta_q = self.alpha * (self.Error * truth_value)
-            self.q_table[index][self.M[index]] += delta_q
+        # self.past_rule_activations is the degree of truth values for the previous state
+        for index, truth_value in enumerate(self.past_rule_activations):
+            delta_q = self.l_rate * (self.error * truth_value)
+            self.q_table[index][self.each_rules_chosen_action[index]] += delta_q
         return self
 
     def save_state_history(self):
-        self.R_ = copy.copy(self.R)
+        self.past_rule_activations = copy.copy(self.current_rule_activations)
 
     def get_initial_action(self, state):
-        self.V.clear()
-        self.Q.clear()
+        self.state_values.clear()
+        self.state_Qs.clear()
         self.truth_value(state)
         action = self.action_selection()
         self.calculate_q_value()
@@ -178,7 +189,11 @@ class CFQLModel(object):
 
     def get_action(self, state):
         self.truth_value(state)
-        action = self.action_selection()
+        # numerator = (np.array(self.current_rule_activations)[:,np.newaxis] * self.q_table).sum(axis=0)
+        # denominator = np.array(self.current_rule_activations).sum()
+        # action = np.argmax(numerator / denominator)
+        action = np.argmax((np.array(self.current_rule_activations)[:,np.newaxis] * self.q_table).mean(axis=0))
+        # action = self.action_selection()
         return action
 
     # online execution of FQL
@@ -209,12 +224,45 @@ class CFQLModel(object):
     #             new_q_values[s,a] = new_q_value
     #     return new_q_values
 
-    def q_backup_sparse_sampled(self, q_values, state_index, action_index, 
-                                next_state_index, reward, rule_weights, discount=0.99):
-        next_state_q_values = q_values[next_state_index, :]
-        values = np.max(next_state_q_values, axis=-1)
-        target_value = (reward + discount * values) * rule_weights
-        return target_value
+    def q_backup_sparse_sampled(self, q_values, states, action_indices, 
+                                next_states, rewards, discount=0.99):
+        target_values = []
+        for idx, state in enumerate(states):
+            action_index = action_indices[idx]
+            next_state = next_states[idx]
+            reward = rewards[idx]
+            self.state_values.clear()
+            self.state_Qs.clear()
+            self.truth_value(next_state) # calculating the degree of applicability for each rule given the current state
+            next_rule_activations = self.current_rule_activations
+            next_state_value = self.calculate_state_value(q_values) # calculates the value of the next state
+            
+            self.state_values.clear()
+            self.state_Qs.clear()
+            self.truth_value(state) # calculating the degree of applicability for each rule given the current state
+            current_rule_activations = self.current_rule_activations
+            self.offline_action_selection(q_values, action_index)
+            this_state_q_value = self.calculate_q_value(q_values)
+            
+            # using these two values follows the CQL algorithm, whereas using the above values follows the FQL algorithm
+            this_state_q_value = 0
+            next_state_value = np.max(q_values[np.argmax(next_rule_activations), :], axis=-1)
+            
+            error = reward + discount * (next_state_value - this_state_q_value)
+            target_values.append(error)
+            # q_table = self.network(torch.arange(self.fis.get_number_of_rules())).detach().numpy()
+            # # self.past_rule_activations is the degree of truth values for the previous state
+            # for index, truth_value in enumerate(self.past_rule_activations):
+            #     delta_q = self.l_rate * ( * truth_value)
+            #     self.q_table[index][self.each_rules_chosen_action[index]] += delta_q
+        return target_values
+        
+            
+        # next_state_indices = next_states
+        # next_state_q_values = q_values[next_state_indices, :]
+        # values = np.max(next_state_q_values, axis=-1)
+        # target_value = (rewards + discount * values)
+        # return target_value
     
     #@title Conservative Q-Learning
     
@@ -242,16 +290,39 @@ class CFQLModel(object):
     #     optimizer.step()
     #     return pred_qvalues.detach().numpy()
     
-    def project_qvalues_cql_sampled(self, state_index, action_index, target_values, 
+    def project_qvalues_cql_sampled(self, states, action_indices, target_values, 
                                     cql_alpha=0.1, num_steps=50, weights=None):
         # train with a sampled dataset
-        target_qvalues = torch.tensor(target_values, dtype=torch.float32)
-        state_index = torch.tensor(state_index, dtype=torch.int64)
-        action_index = torch.tensor(action_index, dtype=torch.int64)
-        pred_qvalues = self.network(state_index)
+        
+        # self.q_table = self.network(torch.arange(self.fis.get_number_of_rules())).detach().numpy()
+        # # self.past_rule_activations is the degree of truth values for the previous state
+        # for index, truth_value in enumerate(self.past_rule_activations):
+        #     delta_q = self.l_rate * (self.error * truth_value)
+        #     self.q_table[index][self.each_rules_chosen_action[index]] += delta_q
+        
+        target_values_array = []
+        state_indices = []
+        action_indices_array = []
+        for idx, state in enumerate(states): # where state is the continuous input
+            action_index = action_indices[idx]
+            error = target_values[idx]
+            self.truth_value(state) # calculating the degree of applicability for each rule given the current state
+            current_rule_activations = np.array(self.current_rule_activations)
+            # current_rule_activations_indices = np.where(current_rule_activations > 0.0)[0]
+            current_rule_activations_indices = [np.argmax(current_rule_activations)]
+            for rule_index in current_rule_activations_indices:
+                truth_value = current_rule_activations[rule_index]
+                state_indices.append(rule_index)
+                action_indices_array.append(action_index)
+                target_values_array.append(truth_value * error)
+        
+        target_qvalues = torch.tensor(target_values_array, dtype=torch.float32)
+        state_indices = torch.tensor(state_indices, dtype=torch.int64)
+        action_indices = torch.tensor(action_indices_array, dtype=torch.int64)
+        pred_qvalues = self.network(state_indices)
         logsumexp_qvalues = torch.logsumexp(pred_qvalues, dim=-1)
         
-        pred_qvalues = pred_qvalues.gather(1, action_index.reshape(-1,1)).squeeze()
+        pred_qvalues = pred_qvalues.gather(1, action_indices.reshape(-1,1)).squeeze()
         cql_loss = logsumexp_qvalues - pred_qvalues
         
         loss = torch.mean((pred_qvalues - target_qvalues)**2)
@@ -290,17 +361,18 @@ class CFQLModel(object):
         
         q_values = np.zeros((number_of_states, number_of_actions))
         for i in range(num_itrs):
+            print(i)
             if sampled:
                 for j in range(project_steps):
-                    training_idx = np.random.choice(np.arange(len(training_dataset)), size=1028) # was 256
-                    state_index, action_index, next_state, reward = get_tensors(training_dataset, training_idx)
+                    training_idx = np.random.choice(np.arange(len(training_dataset)), size=256) # was 256
+                    states, action_indices, next_states, rewards = get_tensors(training_dataset, training_idx)
                     
-                    rule_weights_sample = np.array(rule_weights)[training_idx]
+                    # rule_weights_sample = np.array(rule_weights)[training_idx]
                     
-                    target_values = self.q_backup_sparse_sampled(q_values, state_index, action_index, 
-                                                                 next_state, reward, rule_weights_sample, **kwargs)
+                    target_values = self.q_backup_sparse_sampled(q_values, states, action_indices, 
+                                                                 next_states, rewards, **kwargs)
                     
-                    intermediate_values = self.project_qvalues_cql_sampled(state_index, action_index, 
+                    intermediate_values = self.project_qvalues_cql_sampled(states, action_indices, 
                                                                            target_values, cql_alpha=cql_alpha, weights=None)
                     if j == project_steps - 1:
                         q_values = intermediate_values

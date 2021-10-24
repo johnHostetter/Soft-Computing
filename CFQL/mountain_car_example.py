@@ -163,46 +163,46 @@ def train_env(model=None, max_eps=500):
 # if __name__ == '__main__':
 #     model = train_env(max_eps=500)
 
-model, trajectories, _ = train_env(max_eps=60)
+model, trajectories, _ = train_env(max_eps=10)
 
 env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-cfql = CFQLModel(gamma=0.99, alpha=0.1, ee_rate=1., action_set_length=action_set_length, fis=fis)
+cfql = CFQLModel(gamma=0.99, l_rate=0.1, ee_rate=0.0, action_set_length=action_set_length, fis=fis)
 
 rule_weights = []
-transformed_trajectories = []
-for trajectory in trajectories:
-    state = trajectory[0]
-    action_index = trajectory[1]
-    reward = trajectory[2]
-    next_state = trajectory[3]
-    done = trajectory[4]
+# transformed_trajectories = []
+# for trajectory in trajectories:
+#     state = trajectory[0]
+#     action_index = trajectory[1]
+#     reward = trajectory[2]
+#     next_state = trajectory[3]
+#     done = trajectory[4]
     
-    # this code will only use the rule with the highest degree of activation to do updates
-    cfql.truth_value(state)
-    rule_index = np.argmax(cfql.R)
-    rule_index_weight = cfql.R[rule_index]
-    rule_weights.append(rule_index_weight)
-    cfql.truth_value(next_state)
-    next_rule_index = np.argmax(cfql.R)
-    next_rule_index_weight = cfql.R[next_rule_index]
-    transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
+#     # this code will only use the rule with the highest degree of activation to do updates
+#     cfql.truth_value(state)
+#     rule_index = np.argmax(cfql.current_rule_activations)
+#     rule_index_weight = cfql.current_rule_activations[rule_index]
+#     rule_weights.append(rule_index_weight)
+#     cfql.truth_value(next_state)
+#     next_rule_index = np.argmax(cfql.current_rule_activations)
+#     next_rule_index_weight = cfql.current_rule_activations[next_rule_index]
+#     transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
     
-    # this code will use all rules that are activated greater than epsilon 
-    # epsilon = 0.1
-    # cfql.truth_value(state)
-    # next_rule_index = np.argmax(cfql.R)
-    # next_rule_index_weight = cfql.R[next_rule_index]
-    # indices_of_interest = np.where(np.array(cfql.R) > epsilon)[0]
-    # for rule_index in indices_of_interest:
-    #     truth_value = cfql.R[rule_index]
-    #     rule_weights.append(truth_value)
-    #     transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
+#     # this code will use all rules that are activated greater than epsilon 
+#     # epsilon = 0.1
+#     # cfql.truth_value(state)
+#     # next_rule_index = np.argmax(cfql.R)
+#     # next_rule_index_weight = cfql.R[next_rule_index]
+#     # indices_of_interest = np.where(np.array(cfql.R) > epsilon)[0]
+#     # for rule_index in indices_of_interest:
+#     #     truth_value = cfql.R[rule_index]
+#     #     rule_weights.append(truth_value)
+#     #     transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
 
 print('num. of trajectories: %d' % len(trajectories))
-print('num. of transformed trajectories: %d' % len(transformed_trajectories))
+# print('num. of transformed trajectories: %d' % len(transformed_trajectories))
 
 env.num_states = cfql.fis.get_number_of_rules()
 env.num_actions = env.action_space.n
@@ -212,23 +212,21 @@ env.num_actions = env.action_space.n
 #                                     sampled=True,
 #                                     training_dataset=transformed_trajectories, rule_weights=rule_weights)
 
-cfql.conservative_q_iteration(num_itrs=100, project_steps=50, cql_alpha=0.1, sampled=True,
-                                 training_dataset=transformed_trajectories, rule_weights=rule_weights)
+cfql.conservative_q_iteration(num_itrs=10, project_steps=50, cql_alpha=0.1, sampled=True,
+                                 training_dataset=trajectories, rule_weights=rule_weights)
 q_table = cfql.q_table
 
 env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=0., action_set_length=action_set_length, fis=fis)
-offline_cfql.q_table = q_table
-# q_diff = q_values.max(axis=1) - q_values.min(axis=1)
-# median_q_diff = np.median(q_diff)
+# offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=0.0, action_set_length=action_set_length, fis=fis)
+# offline_cfql.q_table = q_table
 
 # exploit the learned policy
-_, _, _, greedy_offline_rewards = play_mountain_car(offline_cfql)
+_, _, _, greedy_offline_rewards = play_mountain_car(cfql)
 
-# exploit the learned policy, but add a small bit of randomness (performs better than greedy)
-offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=.2, action_set_length=action_set_length, fis=fis)
-offline_cfql.q_table = q_table
-_, _, random_offline_rewards = train_env(offline_cfql, 100)
+# # exploit the learned policy, but add a small bit of randomness (performs better than greedy)
+# offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=.2, action_set_length=action_set_length, fis=fis)
+# offline_cfql.q_table = q_table
+# _, _, random_offline_rewards = train_env(offline_cfql, 100)
