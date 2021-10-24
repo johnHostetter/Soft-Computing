@@ -25,7 +25,7 @@ import numpy as np
 
 from fis import Build
 
-GLOBAL_SEED = 0
+GLOBAL_SEED = 1
 np.random.seed(GLOBAL_SEED)
 random.seed(GLOBAL_SEED)
 
@@ -62,129 +62,6 @@ def get_tensors(list_of_tensors, list_of_indices):
     r = np.array(r)
     return s, a, ns, r
 
-#@title Tabular Q-iteration
-
-def q_backup_sparse(env, q_values, discount=0.99):
-    dS = env.num_states
-    dA = env.num_actions
-      
-    new_q_values = np.zeros_like(q_values)
-    value = np.max(q_values, axis=1)
-    for s in range(dS):
-        for a in range(dA):
-            new_q_value = 0
-            for ns, prob in env.transitions(s, a).items():
-                new_q_value += prob * (env.reward(s,a,ns) + discount*value[ns])
-            new_q_values[s,a] = new_q_value
-    return new_q_values
-
-def q_backup_sparse_sampled(env, q_values, s, a, ns, r, rule_weights, discount=0.99):
-    q_values_ns = q_values[ns, :]
-    values = np.max(q_values_ns, axis=-1)
-    target_value = (r + discount * values) * rule_weights
-    return target_value
-
-#@title Conservative Q-Learning
-
-def project_qvalues_cql(q_values, network, optimizer, num_steps=50, cql_alpha=0.1, weights=None):
-    # regress onto q_values (aka projection)
-    q_values_tensor = torch.tensor(q_values, dtype=torch.float32)
-    for _ in range(num_steps):
-        # Eval the network at each state
-        pred_qvalues = network(torch.arange(q_values.shape[0]))
-        if weights is None:
-            loss = torch.mean((pred_qvalues - q_values_tensor)**2)
-        else:
-            loss = torch.mean(weights*(pred_qvalues - q_values_tensor)**2)
-    
-      # Add cql_loss
-      # You can have two variants of this loss, one where data q-values
-      # also maximized (CQL-v2), and one where only the large Q-values 
-      # are pushed down (CQL-v1) as covered in the tutorial
-    cql_loss = torch.logsumexp(pred_qvalues, dim=-1, keepdim=True) # - pred_qvalues
-    loss = loss + cql_alpha * torch.mean(weights * cql_loss)
-    network.zero_grad()
-    loss.backward()
-    optimizer.step()
-    return pred_qvalues.detach().numpy()
-
-def project_qvalues_cql_sampled(env, s, a, target_values, network, optimizer, cql_alpha=0.1, num_steps=50, weights=None):
-    # train with a sampled dataset
-    target_qvalues = torch.tensor(target_values, dtype=torch.float32)
-    s = torch.tensor(s, dtype=torch.int64)
-    a = torch.tensor(a, dtype=torch.int64)
-    pred_qvalues = network(s)
-    logsumexp_qvalues = torch.logsumexp(pred_qvalues, dim=-1)
-    
-    pred_qvalues = pred_qvalues.gather(1, a.reshape(-1,1)).squeeze()
-    cql_loss = logsumexp_qvalues - pred_qvalues
-    
-    loss = torch.mean((pred_qvalues - target_qvalues)**2)
-    loss = loss + cql_alpha * torch.mean(cql_loss)
-
-    network.zero_grad()
-    loss.backward()
-    optimizer.step()
-    
-    pred_qvalues = network(torch.arange(env.num_states))
-    return pred_qvalues.detach().numpy()
-  
-def conservative_q_iteration(env, 
-                             network,
-                             num_itrs=100, 
-                             project_steps=50,
-                             cql_alpha=0.1,
-                             render=False,
-                             weights=None,
-                             sampled=False,
-                             training_dataset=None, rule_weights=None,
-                             **kwargs):
-    """
-    Runs Conservative Q-iteration.
-    
-    Args:
-      env: A GridEnv object.
-      num_itrs (int): Number of FQI iterations to run.
-      project_steps (int): Number of gradient steps used for projection.
-      cql_alpha (float): Value of weight on the CQL coefficient.
-      render (bool): If True, will plot q-values after each iteration.
-      sampled (bool): Whether to use sampled datasets for training or not.
-      training_dataset (list): list of (s, a, r, ns) pairs
-    """
-    dS = env.num_states
-    dA = env.num_actions
-    
-    optimizer = torch.optim.Adam(network.parameters(), lr=1e-3)
-    weights_tensor = None
-    if weights is not None:
-        weights_tensor = torch.tensor(weights, dtype=torch.float32)
-    
-    q_values = np.zeros((dS, dA))
-    for i in range(num_itrs):
-        if sampled:
-            for j in range(project_steps):
-                training_idx = np.random.choice(np.arange(len(training_dataset)), size=1028) # was 256
-                s, a, ns, r = get_tensors(training_dataset, training_idx)
-                
-                rule_weights_sample = np.array(rule_weights)[training_idx]
-                
-                target_values = q_backup_sparse_sampled(env, q_values, s, a, ns, r, rule_weights_sample, **kwargs)
-                intermed_values = project_qvalues_cql_sampled(
-                env, s, a, target_values, network, optimizer, 
-                cql_alpha=cql_alpha, weights=None,
-                )
-                if j == project_steps - 1:
-                    q_values = intermed_values
-        else:
-            target_values = q_backup_sparse(env, q_values, **kwargs)
-            q_values = project_qvalues_cql(target_values, network, optimizer,
-                                      weights=weights_tensor,
-                                      cql_alpha=cql_alpha,
-                                      num_steps=project_steps)
-      # if render:
-      #   plot_sa_values(env, q_values, update=True, title='Q-values Iteration %d' %i)
-    return q_values
-
 class CFQLModel(object):
     def __init__(self, gamma, alpha, ee_rate,
                  action_set_length, fis=Build()):
@@ -200,8 +77,6 @@ class CFQLModel(object):
         self.action_set_length = action_set_length
         self.fis = fis
 
-        # self.q_table = np.zeros((self.fis.get_number_of_rules(),
-        #                          self.action_set_length))
         self.network = TabularNetwork(self.fis.get_number_of_rules(),
                                  self.action_set_length)
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-3)
@@ -306,6 +181,7 @@ class CFQLModel(object):
         action = self.action_selection()
         return action
 
+    # online execution of FQL
     def run(self, state, reward):
         self.truth_value(state)
         self.calculate_state_value()
@@ -314,3 +190,128 @@ class CFQLModel(object):
         self.calculate_q_value()
         self.save_state_history()
         return action
+    
+    #@title Tabular Q-iteration
+    
+    # --- used for online Q-Learning ---
+    
+    # def q_backup_sparse(self, env, q_values, discount=0.99):
+    #     dS = env.num_states
+    #     dA = env.num_actions
+          
+    #     new_q_values = np.zeros_like(q_values)
+    #     value = np.max(q_values, axis=1)
+    #     for s in range(dS):
+    #         for a in range(dA):
+    #             new_q_value = 0
+    #             for ns, prob in env.transitions(s, a).items():
+    #                 new_q_value += prob * (env.reward(s,a,ns) + discount*value[ns])
+    #             new_q_values[s,a] = new_q_value
+    #     return new_q_values
+
+    def q_backup_sparse_sampled(self, q_values, state_index, action_index, 
+                                next_state_index, reward, rule_weights, discount=0.99):
+        next_state_q_values = q_values[next_state_index, :]
+        values = np.max(next_state_q_values, axis=-1)
+        target_value = (reward + discount * values) * rule_weights
+        return target_value
+    
+    #@title Conservative Q-Learning
+    
+    # --- used for online Q-Learning---
+    
+    # def project_qvalues_cql(self, q_values, network, optimizer, num_steps=50, cql_alpha=0.1, weights=None):
+    #     # regress onto q_values (aka projection)
+    #     q_values_tensor = torch.tensor(q_values, dtype=torch.float32)
+    #     for _ in range(num_steps):
+    #         # Eval the network at each state
+    #         pred_qvalues = network(torch.arange(q_values.shape[0]))
+    #         if weights is None:
+    #             loss = torch.mean((pred_qvalues - q_values_tensor)**2)
+    #         else:
+    #             loss = torch.mean(weights*(pred_qvalues - q_values_tensor)**2)
+        
+    #     # Add cql_loss
+    #     # You can have two variants of this loss, one where data q-values
+    #     # also maximized (CQL-v2), and one where only the large Q-values 
+    #     # are pushed down (CQL-v1) as covered in the tutorial
+    #     cql_loss = torch.logsumexp(pred_qvalues, dim=-1, keepdim=True) # - pred_qvalues
+    #     loss = loss + cql_alpha * torch.mean(weights * cql_loss)
+    #     network.zero_grad()
+    #     loss.backward()
+    #     optimizer.step()
+    #     return pred_qvalues.detach().numpy()
+    
+    def project_qvalues_cql_sampled(self, state_index, action_index, target_values, 
+                                    cql_alpha=0.1, num_steps=50, weights=None):
+        # train with a sampled dataset
+        target_qvalues = torch.tensor(target_values, dtype=torch.float32)
+        state_index = torch.tensor(state_index, dtype=torch.int64)
+        action_index = torch.tensor(action_index, dtype=torch.int64)
+        pred_qvalues = self.network(state_index)
+        logsumexp_qvalues = torch.logsumexp(pred_qvalues, dim=-1)
+        
+        pred_qvalues = pred_qvalues.gather(1, action_index.reshape(-1,1)).squeeze()
+        cql_loss = logsumexp_qvalues - pred_qvalues
+        
+        loss = torch.mean((pred_qvalues - target_qvalues)**2)
+        loss = loss + cql_alpha * torch.mean(cql_loss)
+    
+        self.network.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        
+        number_of_states = self.fis.get_number_of_rules()
+        pred_qvalues = self.network(torch.arange(number_of_states))
+        return pred_qvalues.detach().numpy()
+    
+    def conservative_q_iteration(self, num_itrs=100, project_steps=50, cql_alpha=0.1,
+                                 render=False, weights=None, sampled=False,
+                                 training_dataset=None, rule_weights=None, **kwargs):
+        """
+        Runs Conservative Q-iteration.
+        
+        Args:
+          env: A GridEnv object.
+          num_itrs (int): Number of FQI iterations to run.
+          project_steps (int): Number of gradient steps used for projection.
+          cql_alpha (float): Value of weight on the CQL coefficient.
+          render (bool): If True, will plot q-values after each iteration.
+          sampled (bool): Whether to use sampled datasets for training or not.
+          training_dataset (list): list of (s, a, r, ns) pairs
+        """
+        
+        number_of_states = self.fis.get_number_of_rules()
+        number_of_actions = self.action_set_length
+        
+        weights_tensor = None
+        if weights is not None:
+            weights_tensor = torch.tensor(weights, dtype=torch.float32)
+        
+        q_values = np.zeros((number_of_states, number_of_actions))
+        for i in range(num_itrs):
+            if sampled:
+                for j in range(project_steps):
+                    training_idx = np.random.choice(np.arange(len(training_dataset)), size=1028) # was 256
+                    state_index, action_index, next_state, reward = get_tensors(training_dataset, training_idx)
+                    
+                    rule_weights_sample = np.array(rule_weights)[training_idx]
+                    
+                    target_values = self.q_backup_sparse_sampled(q_values, state_index, action_index, 
+                                                                 next_state, reward, rule_weights_sample, **kwargs)
+                    
+                    intermediate_values = self.project_qvalues_cql_sampled(state_index, action_index, 
+                                                                           target_values, cql_alpha=cql_alpha, weights=None)
+                    if j == project_steps - 1:
+                        q_values = intermediate_values
+            else:
+                raise Exception("The online version of Conservative Fuzzy Q-Learning is not yet available.")
+                # target_values = q_backup_sparse(env, q_values, **kwargs)
+                # q_values = project_qvalues_cql(target_values, network, optimizer,
+                #                           weights=weights_tensor,
+                #                           cql_alpha=cql_alpha,
+                #                           num_steps=project_steps)
+          # if render:
+          #   plot_sa_values(env, q_values, update=True, title='Q-values Iteration %d' %i)
+        self.q_table = q_values
+        return self.q_table
