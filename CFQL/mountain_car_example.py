@@ -7,7 +7,6 @@ Created on Sat Oct 23 22:57:25 2021
 """
 
 import gym
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -18,7 +17,6 @@ from fis import InputStateVariable, Trapeziums, Build
 GLOBAL_SEED = 1
 LOCAL_SEED = 42
 np.random.seed(GLOBAL_SEED)
-
 
 # Define membership functions for MountainCar problems
 def get_fis_env():
@@ -38,13 +36,10 @@ def get_fis_env():
     env.seed(LOCAL_SEED)
     return env, fis
 
-def play_mountain_car(model, max_eps=100):
+def play_mountain_car(model, max_eps=100, render=False):
     env, _ = get_fis_env()
     print('Observation shape:', env.observation_space.shape)
     print('Action length:', env.action_space.n)
-    action_set_length = env.action_space.n
-
-    q_diff = model.q_table.max(axis=1) - model.q_table.min(axis=1)
 
     rewards = []
     r = 0
@@ -71,7 +66,7 @@ def play_mountain_car(model, max_eps=100):
             r = 0
                 
         # render the environment for the last couple episodes
-        if False and iteration + 1 > (max_eps - 5):
+        if render and iteration + 1 > (max_eps - 6):
             env.render()
         
         prev_state = state_value
@@ -82,10 +77,6 @@ def play_mountain_car(model, max_eps=100):
         if reward == 0:
             reward = -1
         action = model.get_action(state_value)
-        
-        # q_values = model.q_table[np.argmax(model.R)]
-        # if np.max(q_values) < np.median(q_diff):
-        #     action_index = random.randint(0, model.action_set_length - 1)
         
         r += reward
         # Reach to 2000 steps --> done
@@ -159,74 +150,20 @@ def train_env(model=None, max_eps=500):
     plt.show()
     return model, trajectories, rewards
 
-
-# if __name__ == '__main__':
-#     model = train_env(max_eps=500)
-
-model, trajectories, _ = train_env(max_eps=10)
+model, trajectories, _ = train_env(max_eps=150)
 
 env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-cfql = CFQLModel(gamma=0.99, l_rate=0.1, ee_rate=0.0, action_set_length=action_set_length, fis=fis)
+cfql = CFQLModel(gamma=0.99, learning_rate=1e-2, ee_rate=0., action_set_length=action_set_length)
 
-rule_weights = []
-# transformed_trajectories = []
-# for trajectory in trajectories:
-#     state = trajectory[0]
-#     action_index = trajectory[1]
-#     reward = trajectory[2]
-#     next_state = trajectory[3]
-#     done = trajectory[4]
+X = [trajectories[0][0]]
+for idx, trajectory in enumerate(trajectories):
+    X.append(trajectory[3])
     
-#     # this code will only use the rule with the highest degree of activation to do updates
-#     cfql.truth_value(state)
-#     rule_index = np.argmax(cfql.current_rule_activations)
-#     rule_index_weight = cfql.current_rule_activations[rule_index]
-#     rule_weights.append(rule_index_weight)
-#     cfql.truth_value(next_state)
-#     next_rule_index = np.argmax(cfql.current_rule_activations)
-#     next_rule_index_weight = cfql.current_rule_activations[next_rule_index]
-#     transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
-    
-#     # this code will use all rules that are activated greater than epsilon 
-#     # epsilon = 0.1
-#     # cfql.truth_value(state)
-#     # next_rule_index = np.argmax(cfql.R)
-#     # next_rule_index_weight = cfql.R[next_rule_index]
-#     # indices_of_interest = np.where(np.array(cfql.R) > epsilon)[0]
-#     # for rule_index in indices_of_interest:
-#     #     truth_value = cfql.R[rule_index]
-#     #     rule_weights.append(truth_value)
-#     #     transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
-
-print('num. of trajectories: %d' % len(trajectories))
-# print('num. of transformed trajectories: %d' % len(transformed_trajectories))
-
-env.num_states = cfql.fis.get_number_of_rules()
-env.num_actions = env.action_space.n
-# q_values = conservative_q_iteration(env, cfql.network,
-#                                     num_itrs=100, project_steps=100, discount=0.95, cql_alpha=0.9, 
-#                                     weights=None, render=True,
-#                                     sampled=True,
-#                                     training_dataset=transformed_trajectories, rule_weights=rule_weights)
-
-cfql.conservative_q_iteration(num_itrs=10, project_steps=50, cql_alpha=0.1, sampled=True,
-                                 training_dataset=trajectories, rule_weights=rule_weights)
-q_table = cfql.q_table
-
-env, fis = get_fis_env()
-print('Observation shape:', env.observation_space.shape)
-print('Action length:', env.action_space.n)
-action_set_length = env.action_space.n
-# offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=0.0, action_set_length=action_set_length, fis=fis)
-# offline_cfql.q_table = q_table
-
-# exploit the learned policy
-_, _, _, greedy_offline_rewards = play_mountain_car(cfql)
-
-# # exploit the learned policy, but add a small bit of randomness (performs better than greedy)
-# offline_cfql = FQLModel(gamma=0.0, alpha=0.0, ee_rate=.2, action_set_length=action_set_length, fis=fis)
-# offline_cfql.q_table = q_table
-# _, _, random_offline_rewards = train_env(offline_cfql, 100)
+train_X = np.array(X)
+cfql.fit(train_X, trajectories)
+_, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100)
+cfql.ee_rate = 0.15
+_, _, _, ee_offline_rewards = play_mountain_car(cfql, 100)
