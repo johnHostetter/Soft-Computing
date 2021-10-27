@@ -150,7 +150,7 @@ def train_env(model=None, max_eps=500):
     plt.show()
     return model, trajectories, rewards
 
-model, trajectories, _ = train_env(max_eps=150)
+model, trajectories, _ = train_env(max_eps=15)
 
 env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
@@ -164,6 +164,6 @@ for idx, trajectory in enumerate(trajectories):
     
 train_X = np.array(X)
 cfql.fit(train_X, trajectories)
-_, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100)
+_, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100, True)
 cfql.ee_rate = 0.15
-_, _, _, ee_offline_rewards = play_mountain_car(cfql, 100)
+_, _, _, ee_offline_rewards = play_mountain_car(cfql, 100, True)

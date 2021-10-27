@@ -82,6 +82,32 @@ class CFQLModel(AdaptiveNeuroFuzzy):
         self.ee_rate = ee_rate
         self.action_set_length = action_set_length
         
+    def d(self, x):
+        return self.truth_value(x).sum()
+        
+    def c_k(self, x, k):
+        """
+
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+        k : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        diffs = []
+        rule_k = self.rules[k]
+        for i, rule_i in enumerate(self.rules):
+            diffs.append(abs(self.q_table[i] - self.q_table[k]).max())
+        return (1/self.d(x)) * np.mean(diffs)
+        
     def get_number_of_rules(self):
         return self.K
 
@@ -284,6 +310,15 @@ class CFQLModel(AdaptiveNeuroFuzzy):
         plt.bar([x for x in range(len(mean_rule_activations))], mean_rule_activations)
         plt.show()
         
+        indices = np.where(mean_rule_activations > np.mean(mean_rule_activations))[0]
+        self.rules = [self.rules[index] for index in indices]
+        self.weights = [self.weights[index] for index in indices]
+        
+        self.import_existing(self.rules, self.weights, self.antecedents, self.consequents)
+        self.orphaned_term_removal()
+        self.preprocessing()
+        self.update()
+        
         # prepare the Q-table
         self.network = TabularNetwork(self.get_number_of_rules(),
                                  self.action_set_length)
@@ -310,6 +345,17 @@ class CFQLModel(AdaptiveNeuroFuzzy):
             
         self.conservative_q_iteration(num_itrs=100, project_steps=50, cql_alpha=0.1, sampled=True,
                                  training_dataset=transformed_trajectories, rule_weights=rule_weights)
+        
+        # importances = []
+        # for k, _ in enumerate(self.rules):
+        #     print(k)
+        #     c_ks = []
+        #     for x in train_X:
+        #         c_ks.append(self.c_k(x, k))
+        #     importances.append(max(c_ks))
+    
+        # plt.bar([x for x in range(len(importances))], importances)
+        # plt.show()
         
         self.gamma=0.0
         self.alpha=0.0
