@@ -78,6 +78,7 @@ class CFQLModel(AdaptiveNeuroFuzzy):
         self.alpha = 0.1
         self.beta = 0.7
         self.gamma = gamma
+        self.cql_alpha = 0.1
         self.learning_rate = learning_rate
         self.ee_rate = ee_rate
         self.action_set_length = action_set_length
@@ -343,7 +344,7 @@ class CFQLModel(AdaptiveNeuroFuzzy):
             next_rule_index_weight = self.current_rule_activations[next_rule_index]
             transformed_trajectories.append((rule_index, action_index, reward, next_rule_index, done))
             
-        self.conservative_q_iteration(num_itrs=100, project_steps=50, cql_alpha=0.1, sampled=True,
+        self.conservative_q_iteration(num_itrs=100, project_steps=50, cql_alpha=self.cql_alpha, sampled=True,
                                  training_dataset=transformed_trajectories, rule_weights=rule_weights)
         
         # importances = []
