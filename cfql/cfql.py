@@ -26,17 +26,20 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# get the current working directory, but only keep the parent folder (which is 'fuzzy')
-path = re.split(r"\bfuzzy\b", os.getcwd(), 1)[0] + 'fuzzy'
-# ignore any directory that has '.' in it (e.g. .gitignore)
-directories = [folder for folder in os.listdir(path) if '.' not in folder]
-
-for directory in directories:
-    sys.path.append(path + '/' + directory)
+try:
+    # get the current working directory, but only keep the parent folder (which is 'fuzzy')
+    path = re.split(r"\bfuzzy\b", os.getcwd(), 1)[0] + 'fuzzy'
+    # ignore any directory that has '.' in it (e.g. .gitignore)
+    directories = [folder for folder in os.listdir(path) if '.' not in folder]
+    
+    for directory in directories:
+        sys.path.append(path + '/' + directory)
+except FileNotFoundError:
+    pass
     
 from ecm import ECM
-from adaptive import AdaptiveNeuroFuzzy
 from clip import CLIP, rule_creation
+from adaptive import AdaptiveNeuroFuzzy
 
 GLOBAL_SEED = 0
 # 1. Set the `PYTHONHASHSEED` environment variable at a fixed value
