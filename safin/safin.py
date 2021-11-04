@@ -11,7 +11,6 @@ import random
 import numpy as np
 
 from copy import deepcopy
-from functools import partial
 
 from nfn import ModifyRulesNeuroFuzzy
 from clip import CLIP, rule_creation
@@ -22,7 +21,7 @@ class SaFIN(ModifyRulesNeuroFuzzy):
         Layer 1 consists of the input (variable) nodes.
         Layer 2 is the antecedent nodes.
         Layer 3 is the rule nodes.
-        Layer 4 consists of the consequent ndoes.
+        Layer 4 consists of the consequent nodes.
         Layer 5 is the output (variable) nodes.
         
         In the SaFIN model, the input vector is denoted as:
@@ -179,16 +178,19 @@ class SaFIN(ModifyRulesNeuroFuzzy):
         if self.Q is None:
             self.Q = Y.shape[1]
         
-        training_data = list(zip(X, Y))
-        random.shuffle(training_data)
-        shuffled_X, shuffled_Y = zip(*training_data)
-        shuffled_X, shuffled_Y = np.array(shuffled_X), np.array(shuffled_Y)
-        
         if batch_size is None:
             batch_size = 1
-        NUM_OF_BATCHES = round(shuffled_X.shape[0] / batch_size)
+        NUM_OF_BATCHES = round(X.shape[0] / batch_size)
         
         for epoch in range(epochs):
+            if shuffle:
+                training_data = list(zip(X, Y))
+                random.shuffle(training_data)
+                shuffled_X, shuffled_Y = zip(*training_data)
+                shuffled_X, shuffled_Y = np.array(shuffled_X), np.array(shuffled_Y)
+            else:
+                shuffled_X, shuffled_Y = X, Y
+            
             for i in range(NUM_OF_BATCHES):
                 print('--- Epoch %d; Batch %d ---' % (epoch + 1, i + 1))
                 batch_X = X[batch_size*i:batch_size*(i+1)]

@@ -60,8 +60,12 @@ def play_mountain_car(model, max_eps=100, render=False):
                 epsilon = best_mean_rewards[-1] - best_mean_rewards[-2]
             else:
                 epsilon = 0
-            print('EPS=', iteration, ' reward=', r,
-                  ' epsilon=', model.ee_rate, ' best mean eps=', epsilon)
+            try:
+                print('EPS=', iteration, ' reward=', r,
+                      ' epsilon=', model.ee_rate, ' best mean eps=', epsilon)
+            except AttributeError:
+                print('EPS=', iteration, ' reward=', r,
+                      ' epsilon=', 0.0, ' best mean eps=', epsilon)
             iteration += 1
             r = 0
                 
@@ -83,7 +87,10 @@ def play_mountain_car(model, max_eps=100, render=False):
         if r <= -2000:
             done = True
     print(model.q_table)
-    print('Epsilon=', model.ee_rate)
+    try:
+        print('Epsilon=', model.ee_rate)
+    except AttributeError:
+        print('Epsilon=', 0.0)
     plt.figure(figsize=(14, 5))
     plt.plot(best_mean_rewards[1:])
     plt.ylabel('Rewards')
@@ -92,6 +99,41 @@ def play_mountain_car(model, max_eps=100, render=False):
     env.close()
     
     return model, np.array(visited_states), trajectories, rewards
+
+def random_play_mountain_car(model=None, max_eps=500):
+    env, _ = get_fis_env()
+    print('Observation shape:', env.observation_space.shape)
+    print('Action length:', env.action_space.n)
+
+    rewards = []
+    r = 0
+    done = True
+    iteration = 0
+    trajectories = []
+    best_mean_rewards = []
+    while iteration < max_eps:
+        if done:
+            state_value = env.reset()
+            action = env.action_space.sample()
+            rewards.append(r)
+            print('EPS=', iteration, ' reward=', r,
+                  ' epsilon=', 1.0, ' best mean eps=', 1.0)
+            iteration += 1
+            r = 0
+
+        prev_state = state_value
+        state_value, reward, done, _ = env.step(action)
+        trajectories.append((prev_state, action, reward, state_value, done))
+        # Change the rewards to -1
+        if reward == 0:
+            reward = -1
+        action = env.action_space.sample()
+        r += reward
+        # Reach to 2000 steps --> done
+        if r <= -2000:
+            done = True
+    print('Epsilon=', 1.0)
+    return model, trajectories, rewards
 
 def train_env(model=None, max_eps=500):
     env, fis = get_fis_env()
@@ -150,20 +192,29 @@ def train_env(model=None, max_eps=500):
     plt.show()
     return model, trajectories, rewards
 
+# 10 episodes also works, but some interactions will still require ~2000 time-steps
 model, trajectories, _ = train_env(max_eps=15)
+# _, trajectories, _ = random_play_mountain_car(max_eps=100)
 
 env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-cfql = CFQLModel(gamma=0.99, learning_rate=1e-2, ee_rate=0., action_set_length=action_set_length)
-
+clip_params = {'alpha':0.1, 'beta':0.7}
+fis_params = {'inference_engine':'product'}
+# note this alpha for CQL is different than CLIP's alpha
+cql_params = {
+    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50, 
+    'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
+    }
+cfql = CFQLModel(clip_params, fis_params, cql_params)
+new_cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
 for idx, trajectory in enumerate(trajectories):
     X.append(trajectory[3])
     
 train_X = np.array(X)
-cfql.fit(train_X, trajectories)
-_, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100, True)
+cfql.fit(train_X, trajectories, ecm=True, Dthr=0.01, verbose=True)
+_, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100, False)
 cfql.ee_rate = 0.15
-_, _, _, ee_offline_rewards = play_mountain_car(cfql, 100, True)
+_, _, _, ee_offline_rewards = play_mountain_car(cfql, 100, False)

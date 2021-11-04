@@ -6,12 +6,11 @@ Created on Tue Oct  5 17:23:46 2021
 @author: john
 """
 
+import numpy as np
 import sympy as sym
-import matplotlib.pyplot as plt
 
-from common import general_euclidean_distance
-from sklearn.datasets import make_blobs
 from sympy.solvers.solveset import linsolve
+from scipy.spatial.distance import minkowski
 
 SUPPRESS_EXCEPTIONS = True
 
@@ -22,6 +21,13 @@ class Cluster:
         self.support = 1
     def add_support(self):
         self.support += 1
+        
+def general_euclidean_distance(x, y):
+    if len(x) == len(y): 
+        q = len(x)
+        return minkowski(x, y, p=2) / np.power(q, 0.5)
+    else:
+        raise TypeError('The vectors must of of equal dimensionality in order to use the General Euclidean Distance metric.')
 
 def ECM(X, Cs, Dthr, SUPPRESS_EXCEPTIONS=True):
     for i, x in enumerate(X):
@@ -152,13 +158,3 @@ def ECM(X, Cs, Dthr, SUPPRESS_EXCEPTIONS=True):
 
 def ECMc(X, Cs, Dthr):
     raise NotImplementedError('The offline ECMc function has not been implemented yet. It requires Mathwork\'s Constrained Minimization Method.')     
-            
-centers = [(-5, -5), (5, 5)]
-cluster_std = [0.8, 1]
-
-X, y = make_blobs(n_samples=100, cluster_std=cluster_std, centers=centers, n_features=2, random_state=1)
-
-plt.scatter(X[y == 0, 0], X[y == 0, 1], color="red", s=10, label="Cluster1")
-plt.scatter(X[y == 1, 0], X[y == 1, 1], color="blue", s=10, label="Cluster2")
-
-Cs = ECM(X, [], 3)

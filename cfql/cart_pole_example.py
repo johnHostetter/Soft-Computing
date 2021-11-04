@@ -8,8 +8,6 @@ Created on Tue Oct 26 20:23:36 2021
 
 import os
 import gym
-import time
-import copy
 import torch
 import random
 import numpy as np
@@ -43,13 +41,11 @@ def play_cart_pole(env, model, num_episodes, gamma=0.0,
         
         while not done:
             try:
-                q_values = model.predict(state[np.newaxis, :])
-                action = np.argmax(q_values)
+                action = model.get_action(state[np.newaxis, :])
                 # Take action and add reward to total
                 next_state, reward, done, _ = env.step(action)
             except AssertionError:
-                q_values = model.predict(state)
-                action = torch.argmax(q_values).item()
+                action = model.get_action(state)
             
                 # Take action and add reward to total
                 next_state, reward, done, _ = env.step(action)
@@ -135,7 +131,7 @@ n_state = env.observation_space.shape[0]
 # Number of actions
 n_action = env.action_space.n
 # Number of episodes
-n_episodes = 500
+n_episodes = 15
 # Number of hidden nodes in the DQN
 n_hidden = 50
 # Learning rate
@@ -147,14 +143,21 @@ trajectories, _, states = random_search_cart_pole(env, n_episodes)
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-cfql = CFQLModel(gamma=0.99, learning_rate=1e-1, ee_rate=0., action_set_length=action_set_length)
+clip_params = {'alpha':0.1, 'beta':0.7}
+fis_params = {'inference_engine':'product'}
+# note this alpha for CQL is different than CLIP's alpha
+cql_params = {
+    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50, 
+    'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
+    }
 
+cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
 for idx, trajectory in enumerate(trajectories):
     X.append(trajectory[3])
     
 train_X = np.array(X)
-cfql.fit(train_X, trajectories)
-_, _, _, greedy_offline_rewards = play_cart_pole(env, cfql, 100)
+cfql.fit(train_X, trajectories, ecm=True, Dthr=0.01, verbose=True)
+_, _, greedy_offline_rewards = play_cart_pole(env, cfql, 100)
 cfql.ee_rate = 0.15
-_, _, _, ee_offline_rewards = play_cart_pole(env, cfql, 100)
+_, _, ee_offline_rewards = play_cart_pole(env, cfql, 100)

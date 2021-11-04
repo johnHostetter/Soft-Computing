@@ -149,6 +149,7 @@ class CoreNeuroFuzzy:
         denominator = np.nansum((temp_transformation * flat_widths), axis=2)
         self.f5 = numerator / denominator
         if np.isnan(self.f5).any():
+            raise Exception()
             self.f5[np.isnan(self.f5)] = 0.0 # nan values may appear if no rule in the rule base is applicable to an observation, zero out the nan values
         return self.f5
 
@@ -223,6 +224,61 @@ class CoreNeuroFuzzy:
         est_Y = self.predict(X)
         return RMSE(est_Y, Y)
     
+    def backpropagation(self, x, y):
+        # (1) calculating the error signal in the output layer
+        
+        e5_m = y - self.o5 # y actual minus y predicted
+        # e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node, shape is (num of observations, num of output nodes)
+        e5 = np.multiply(e5_m[:,:,np.newaxis], self.W_4.T) # shape is (num of observations, num of output nodes, num of output terms)
+        error = (self.o4 * e5.sum(axis=1))
+        
+        # delta centers
+        flat_centers = self.term_dict['consequent_centers'].flatten()
+        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_widths = self.term_dict['consequent_widths'].flatten()
+        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        # y4_k = (centers * self.W_4.T)
+        # numerator = (widths * y4_k)
+        widths = np.multiply(flat_widths[:,np.newaxis], self.W_4).T
+        num = np.multiply(widths[np.newaxis,:,:], self.o4[:, np.newaxis,:])
+        den = np.power(num.sum(axis=2), 2)
+        consequent_delta_c = e5.sum(axis=1) * (num / den[:, :, np.newaxis]).sum(axis=1)
+        
+        # delta widths
+        # c_lk = (flat_centers * self.W_4.T)
+        # lhs_term = np.dot(den, c_lk)
+        # rhs_term = np.multiply(num, c_lk)
+        # compatible_rhs_term = rhs_term.sum(axis=1)
+        # difference = lhs_term - compatible_rhs_term
+        # numerator = np.multiply(self.o4, difference)
+        # denominator = np.power(den, 2)
+        # compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
+        # division = (compatible_numerator / denominator[:, :, np.newaxis])
+        # consequent_delta_widths = division.sum(axis=1)
+        
+        # between consequents and outputs
+        tmp = np.zeros((x.shape[0], self.Q, self.total_consequents)) # should be the same shape as self.W_4.T, but it is (num of observations, num of output nodes, num of output terms)
+        # start_idx = 0
+        # for q in range(self.Q):
+        #     end_idx = start_idx + self.L[q]
+        #     W_4[start_idx:end_idx, q] = 1
+        #     start_idx = end_idx
+        
+        y_lk = np.swapaxes(self.o4[:,:,np.newaxis] * self.W_4, 1, 2) # shape is (num of observations, num of output nodes, num of output terms)
+        c_lk = np.multiply(flat_centers[:,np.newaxis], self.W_4).T
+        lhs_term = (y_lk * widths[np.newaxis,:,:])
+        rhs_term = (y_lk * widths[np.newaxis,:,:] * c_lk[np.newaxis,:,:])
+        for q in range(self.Q): # iterate over the output nodes
+            for k in range(self.total_consequents): # iterate over their terms
+                if self.W_4.T[q, k] == 1:
+                    val = ((y_lk[:, q, k])[:,np.newaxis] * ((c_lk[q, k] * lhs_term.sum(axis=2)) - rhs_term.sum(axis=2)))
+                    val /= np.power(lhs_term.sum(axis=2), 2)
+                    tmp[:, q, k] = val[:, q]
+                    
+        consequent_delta_widths = e5.sum(axis=1) * tmp.sum(axis=1)
+        
+        return consequent_delta_c, consequent_delta_widths
+    
 class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
     """
         Contains functions necessary for neuro-fuzzy network creation and adaptability.
@@ -235,7 +291,7 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
         Layer 1 consists of the input (variable) nodes.
         Layer 2 is the antecedent nodes.
         Layer 3 is the rule nodes.
-        Layer 4 consists of the consequent ndoes.
+        Layer 4 consists of the consequent nodes.
         Layer 5 is the output (variable) nodes.
         
         The input vector is denoted as:
