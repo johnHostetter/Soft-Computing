@@ -9,10 +9,11 @@ Created on Sat Oct 23 17:58:04 2021
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
-from fuzzy import InputStateVariable
-from fuzzy import Trapeziums, Gaussian
-from fuzzy import Build
-from nfqn import NeuroFuzzyQNetwork as FQLModel
+
+from fuzzy.safin.fuzzy import InputStateVariable
+from fuzzy.safin.fuzzy import Trapeziums, Gaussian
+from fuzzy.safin.fuzzy import Build
+from fuzzy.safin.nfqn import NeuroFuzzyQNetwork as FQLModel
 
 GLOBAL_SEED = 1
 LOCAL_SEED = 42
@@ -75,11 +76,11 @@ def play_mountain_car(model, max_eps=100):
                   ' epsilon=', model.ee_rate, ' best mean eps=', epsilon)
             iteration += 1
             r = 0
-                
+
         # render the environment for the last couple episodes
         if False and iteration + 1 > (max_eps - 5):
             env.render()
-        
+
         prev_state = state_value
         state_value, reward, done, _ = env.step(action)
         visited_states.append(state_value)
@@ -98,9 +99,9 @@ def play_mountain_car(model, max_eps=100):
     plt.plot(best_mean_rewards[1:])
     plt.ylabel('Rewards')
     plt.show()
-    
+
     env.close()
-    
+
     return model, np.array(visited_states), trajectories
 
 def train_env(model=None, max_eps=500):
@@ -143,11 +144,11 @@ def train_env(model=None, max_eps=500):
             model.ee_rate -= model.ee_rate * 0.01
             if model.ee_rate <= 0.2:
                 model.ee_rate = 0.2
-                
+
         # render the environment for the last couple episodes
         if iteration + 1 > (max_eps - 3):
             env.render()
-        
+
         prev_state = state_value
         state_value, reward, done, _ = env.step(action)
         visited_states.append(state_value)
@@ -166,9 +167,9 @@ def train_env(model=None, max_eps=500):
     plt.plot(best_mean_rewards[1:])
     plt.ylabel('Rewards')
     plt.show()
-    
+
     env.close()
-    
+
     return model, np.array(visited_states), trajectories
 
 # if __name__ == '__main__':
@@ -191,7 +192,7 @@ for i in range(len(antecedents)):
     variable = InputStateVariable()
     variable.fuzzy_set_list = terms
     input_variables.append(variable)
-    
+
 clip_fis = Build()
 clip_fis.list_of_input_variable = input_variables
 clip_fql = FQLModel(gamma=0.99, alpha=0.1, ee_rate=1., action_set_length=3, fis=clip_fis)
@@ -218,5 +219,5 @@ for epoch_idx in range(1):
             offline_fql.get_initial_offline_action(state, action_index)
         offline_fql.offline_run(state, action_index, reward)
         new_episode = done
-    
+
 played_model, _, _ = play_mountain_car(offline_fql, max_eps=50)

@@ -6,7 +6,7 @@ Created on Sat Oct 23 17:59:38 2021
 @author: john
 """
 
-from clip import gaussian
+from fuzzy.safin.clip import gaussian
 
 class InputStateVariable(object):
     fuzzy_set_list = []
@@ -16,12 +16,12 @@ class InputStateVariable(object):
 
     def get_fuzzy_sets(self):
         return self.fuzzy_set_list
-    
+
 class Gaussian(object):
     def __init__(self, center, sigma):
         self.center = center
         self.sigma = sigma
-    
+
     def membership_value(self, input_value):
         return gaussian(input_value, self.center, self.sigma)
 

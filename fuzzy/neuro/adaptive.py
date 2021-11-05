@@ -9,8 +9,8 @@ Created on Fri Oct 22 23:19:15 2021
 import time
 import numpy as np
 
-from core import CoreNeuroFuzzy
-from utilities import boolean_indexing
+from fuzzy.neuro.core import CoreNeuroFuzzy
+from fuzzy.common.utilities import boolean_indexing
     
 class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
     """
@@ -57,7 +57,7 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
         having already processed some kind of input (e.g. they may make a reference to self.f3 or similar).
     """
     def __init__(self):
-        super().__init__()
+        CoreNeuroFuzzy.__init__(self)
         self.rules = [] # the fuzzy logic rules
         self.weights = [] # the weights corresponding to the rules, the i'th weight is associated with the i'th rule
         self.antecedents = []

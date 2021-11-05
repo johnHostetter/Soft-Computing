@@ -16,9 +16,9 @@ import numpy as np
 
 from copy import copy, deepcopy
 
-from fuzzy import Build
-from clip import CLIP, rule_creation
-from nfn import AdaptiveNeuroFuzzy
+from fuzzy.safin.fuzzy import Build
+from fuzzy.safin.clip import CLIP, rule_creation
+from fuzzy.safin.nfn import AdaptiveNeuroFuzzy
 
 class NeuroFuzzyQNetwork(AdaptiveNeuroFuzzy):
     """
@@ -325,7 +325,7 @@ class NeuroFuzzyQNetwork(AdaptiveNeuroFuzzy):
                         end = start + self.L[q]
                         tmp[q, :self.L[q]] = avg_consequent_delta_widths[start:end]
                         start = end
-                        
+
                     self.term_dict['consequent_widths'] += l_rate * tmp
 
                 self.antecedents = CLIP(batch_X, batch_Y, X_mins, X_maxes,

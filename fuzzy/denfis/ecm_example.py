@@ -8,7 +8,7 @@ Created on Wed Oct 27 14:41:23 2021
 
 import matplotlib.pyplot as plt
 
-from ecm import ECM
+from fuzzy.denfis.ecm import ECM
 from sklearn.datasets import make_blobs
 
 SUPPRESS_EXCEPTIONS = True

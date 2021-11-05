@@ -8,8 +8,9 @@ Created on Mon Jun 15 21:38:49 2020
 import math
 import copy
 import numpy as np
-from garic import AEN, SAM
 import matplotlib.pyplot as plt
+
+from garic import AEN, SAM
 
 #np.random.seed(0)
 
@@ -29,7 +30,7 @@ def NFN_bellShapedMembership(params, x):
 
 def NFN_generalBellShapedMembership(params, x):
     f = 1 / (1 + pow(abs((x - params['center']) / params['sigma']), 2*params['b']))
-    return f   
+    return f
 
 def NFN_leftSigmoidMembership(params, x):
     return 1 / (pow(math.e, np.abs(15/params['sigma']) * (x + params['center'])) + 1)
@@ -40,15 +41,15 @@ def NFN_rightSigmoidMembership(params, x):
 class Term():
     """ a linguistic term for a linguistic variable """
     def __init__(self, var, function, params, support=None, label=None, var_label=None):
-        """ The 'var' parameter allows this linguistic term to be 
-        traced back to its corresponding linguistic variable. 
+        """ The 'var' parameter allows this linguistic term to be
+        traced back to its corresponding linguistic variable.
         The parameter 'function' allows the linguistic term
-        to be defined by a variety of applicable functions and is 
-        the linguistic term's membership function. The parameter 
-        'params' is a dictionary that specifies the parameters of 
+        to be defined by a variety of applicable functions and is
+        the linguistic term's membership function. The parameter
+        'params' is a dictionary that specifies the parameters of
         the function argument. The support (optional) specifies
-        how many observations were used in creating the membership 
-        function. The label (optional) assigns a name to this 
+        how many observations were used in creating the membership
+        function. The label (optional) assigns a name to this
         linguistic term. """
         self.var = var # the ID of the linguistic variable to which this term belongs to
         self.function = function # the membership function
@@ -64,8 +65,8 @@ class Term():
 
 class Variable():
     def __init__(self, idx, terms, label=None):
-        """ The parameter 'idx' is the index of the corresponding input/output, 
-        name is the linguistic variable's name, and terms are the values that 
+        """ The parameter 'idx' is the index of the corresponding input/output,
+        name is the linguistic variable's name, and terms are the values that
         variable can take on. """
         self.idx = idx # the corresponding input/output or feature of this variable
         self.terms = terms # the linguistic terms for which this linguistic variable is defined over
@@ -86,11 +87,11 @@ class Variable():
                 y_list.append(fuzzySet.degree(x))
             plt.plot(x_list, y_list, color=np.random.rand(3,), label=fuzzySet.label)
 
-        if self.label != None:    
+        if self.label != None:
             plt.title('%s Fuzzy Variable' % self.label)
         else:
             plt.title('Unnamed Fuzzy Variable')
-        
+
         plt.axes()
         plt.xlim([lower, upper])
         plt.ylim([0, 1.1])
@@ -98,11 +99,11 @@ class Variable():
         plt.ylabel('Degree of Membership')
         plt.legend()
         plt.show()
-        
+
 class Rule():
     def __init__(self, antecedents, consequents):
-        """ Antecedents is an ordered list of terms in respect to the order of 
-        input indexes and consequents is an ordered list of terms in respect 
+        """ Antecedents is an ordered list of terms in respect to the order of
+        input indexes and consequents is an ordered list of terms in respect
         to the order of output indexes. """
         self.antecedents = antecedents
         self.consequents = consequents
@@ -117,7 +118,7 @@ class Rule():
             if i + 1 == len(self.antecedents):
                 text += ', THEN '
             else:
-                text += ', AND ' 
+                text += ', AND '
         for i in range(len(self.consequents)):
             consequent = self.consequents[i]
             text += str(consequent)
@@ -141,7 +142,7 @@ class Rule():
         for antecedent in self.antecedents:
             lst.append(antecedent.label + ' + ' + antecedent.var_label)
         return ' - '.join(lst)
-    
+
 class eFL_ACC():
     """ Empirical Fuzzy Logic Actor Critic Controller """
     def __init__(self, inputVariables, outputVariables, rules, h, lower=-25, upper=25):
@@ -244,7 +245,7 @@ class GenericASN():
                 if consequent in rule.consequents:
 #                if consequent.label in rule.consequents[0].label:
                     weights[row, col] = 1
-        return weights            
+        return weights
     def updateRules(self, new_rules):
         """ Change/update the rules used in the action selection network. """
         self.rules = new_rules # generates the rules layer
@@ -283,7 +284,7 @@ class GenericASN():
             f += (self.consequents[idx].params['center'] * self.consequents[idx].params['sigma'] * o4activation[idx])
             denominator += (self.consequents[idx].params['sigma'] * o4activation[idx])
         a = f / denominator
-        return a    
+        return a
     def dmu_dx(self, params, x):
         b = params['b']
         c = params['center']
@@ -301,18 +302,18 @@ class GenericASN():
     def dmu_db(self, params, x):
         b = params['b']
         c = params['center']
-        a = params['sigma']  
+        a = params['sigma']
         numerator = 2 * np.log(math.pow(abs((x - c)/a) * abs((x - c)/a), 2*b))
         denominator = math.pow(1 + math.pow(abs((x - c)/a), 2*b), 2)
         return -numerator / denominator
     def dmu_da(self, params, x):
         b = params['b']
         c = params['center']
-        a = params['sigma']  
+        a = params['sigma']
         numerator = 2 * b * math.pow(abs((x - c)/a), 2*b - 2) * math.pow((x - c), 2)
         denominator = math.pow(a, 3) * math.pow((1 + math.pow(abs((x - c)/a), 2*b)), 2)
         return numerator / denominator
-    
+
     def backpropagation(self, aen, sam, t, actual):
         # (1/2) tune consequents
         if (self.Fs[t] - self.Fs[t-1]) == 0: # divide by zero error is possible here, investigate why later
@@ -321,26 +322,26 @@ class GenericASN():
             dv_dF = (aen.v(t, t) - aen.v(t-1, t-1)) / (self.Fs[t] - self.Fs[t-1])
         numerator = 0.0
         denominator = 0.0
-        
+
         o4activation = self.O4[t]
-        
+
         for idx in range(len(self.consequents)):
             u_i = o4activation[idx]
             consequent = self.consequents[idx]
             numerator += consequent.params['center'] * consequent.params['sigma'] * u_i
             denominator += consequent.params['sigma'] * u_i
-        
+
 #        print('dv_dF: %s' % dv_dF)
 #        print('numerator: %s' % numerator)
 #        print('denominator: %s' % denominator)
-            
+
         for idx in range(len(self.consequents)):
             u_i = o4activation[idx]
             consequent = self.consequents[idx]
 #            consequent.params['center'] += self.eta * dv_dF * ((consequent.params['sigma'] * u_i) / denominator)
 #            consequent.params['sigma'] += self.eta * dv_dF * (((consequent.params['center'] * u_i * denominator) - (numerator * u_i)) / (pow(denominator, 2)))
-            
-            
+
+
             # TRYING OUT GENERAL BELL SHAPED
 #            consequent.params['center'] += self.eta * np.sign(dv_dF) * ((consequent.params['sigma'] * u_i) / denominator)
             local_eta = 5e-6
@@ -349,14 +350,14 @@ class GenericASN():
             consequent.params['sigma'] += local_eta * self.dmu_da(consequent.params, u_i)
             consequent.params['b'] += 3e-10 * np.sign(dv_dF) * self.dmu_db(consequent.params, u_i)
 
-            
-            
+
+
 #            consequent.params['sigma'] += self.eta * (((consequent.params['center'] * u_i * denominator) - (numerator * u_i)) / (pow(denominator, 2))) # remove dv_dF because it results in sigma becoming negative, which makes no sense
 
 #            consequent.params['sigma'] += self.eta * np.sign(dv_dF) * (((consequent.params['center'] * u_i * denominator) - (numerator * u_i)) / (pow(denominator, 2))) # can result in large negative numbers -- need to fix
 
         # (2/2) tune antecedents
-        
+
 #        delta_5 = 1
         delta_5 = np.sign(dv_dF)
         delta_4 = {} # indexed by consequents
@@ -368,7 +369,7 @@ class GenericASN():
 #            delta_4[idx] = delta_5 * (((consequent.params['center'] * consequent.params['sigma'] * denominator) - (numerator * consequent.params['sigma'])) / (pow(denominator, 1)))
 
         delta_3 = delta_4
-                
+
         for i in range(len(self.X[t])):
             x = self.X[t]
             u_i = x[i]
@@ -378,9 +379,9 @@ class GenericASN():
                 a_i = antecedent.degree(u_i) # degree currently includes e^f, so this is actually activation function
                 delta_m_ij = a_i * (2 * (u_i - antecedent.params['center'])) / pow(antecedent.params['sigma'], 2)
                 delta_sigma_ij = a_i * pow((2 * (u_i - antecedent.params['center'])), 2) / pow(antecedent.params['sigma'], 3)
-                
+
                 # calculate dE / da_i
-                
+
                 # first, find all the rules that this antecedent feeds into
                 ruleIndexes = np.where(self.o2o3Weights[j]==1.0)[0] # get all rules that receive input from this antecedent
                 # dE / da_i is the summation of q_k
@@ -392,22 +393,22 @@ class GenericASN():
                     deg = rule.degreeOfApplicability(self.k, self.X[t])
                     if deg == a_i:
                         # find the error of this rule's consequence
-                        
+
                         # find the consequent's index of this rule
                         consequentIndexes = np.where(self.o3o4Weights[k]==1.0)[0]
-                        
+
                         # the error of the kth rule is the summation of the errors of its consequences
                         for consequentIndex in consequentIndexes:
                             q_k += delta_3[consequentIndex]
                     else:
                         q_k = 0.0 # do nothing
-                    
+
                     dE_da_i += q_k
-                    
+
                     # --- TRYING SOMETHING NEW HERE ---
-        
+
 #                    rule.weight = np.tanh(rule.weight + (self.eta * dE_da_i))
-#                    
+#
 #                    if rule.weight >= 0:
 ##                        if not(rule.active):
 ##                            print('%sth rule dropping in' % k)
@@ -416,9 +417,9 @@ class GenericASN():
 ##                        if rule.active:
 ##                            print('%sth rule dropping out' % k)
 #                        rule.active = False
-                    
+
                     # --- END OF TRYING SOMETHING NEW HERE ---
-                
+
                 # UPDATE THE WEIGHTS
 #                print('dE_da_i %s' % dE_da_i)
 #                print('delta_m_ij %s' % delta_m_ij)

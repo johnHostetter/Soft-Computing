@@ -13,7 +13,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-from cfql import CFQLModel
+from fuzzy.reinforcement.cfql import CFQLModel
 
 SEED = 10
 os.environ['PYTHONHASHSEED']=str(SEED)
@@ -21,15 +21,15 @@ torch.manual_seed(SEED)
 random.seed(SEED)
 np.random.seed(SEED)
 
-def play_cart_pole(env, model, num_episodes, gamma=0.0, 
+def play_cart_pole(env, model, num_episodes, gamma=0.0,
                title = 'CQL', verbose=True):
     global FUZZY
     """Deep Q Learning algorithm using the DQN. """
-    
+
     final = []
     episode_i = 0
     episodes = []
-    
+
     for episode in range(num_episodes):
         episode_i += 1
         memory = []
@@ -38,7 +38,7 @@ def play_cart_pole(env, model, num_episodes, gamma=0.0,
         state = env.reset()
         done = False
         total = 0
-        
+
         while not done:
             try:
                 action = model.get_action(state[np.newaxis, :])
@@ -46,30 +46,30 @@ def play_cart_pole(env, model, num_episodes, gamma=0.0,
                 next_state, reward, done, _ = env.step(action)
             except AssertionError:
                 action = model.get_action(state)
-            
+
                 # Take action and add reward to total
                 next_state, reward, done, _ = env.step(action)
-            
+
             # Update total and memory
             total += reward
             state = next_state
             memory.append((state, action, reward, next_state, done))
-        
+
         memory.append((state, action, reward, next_state, done))
         final.append(total)
         episodes.append({'trajectory':memory, 'cummulative reward':total})
         plot_results(final, title)
-        
+
         if verbose:
             print("episode: {}, total reward: {}".format(episode_i, total))
-            
+
     return episodes, memory, final
 
-def plot_results(values, title=''):   
+def plot_results(values, title=''):
     ''' Plot the reward curve and histogram of results over time.'''
     # Update the window after each episode
     # clear_output(wait=True)
-    
+
     # Define the figure
     f, ax = plt.subplots(nrows=1, ncols=2, figsize=(12,5))
     f.suptitle(title)
@@ -86,7 +86,7 @@ def plot_results(values, title=''):
         ax[0].plot(x,p(x),"--", label='trend')
     except:
         print('')
-    
+
     # Plot the histogram of results
     ax[1].hist(values[-50:])
     ax[1].axvline(195, c='red', label='goal')
@@ -147,7 +147,7 @@ clip_params = {'alpha':0.1, 'beta':0.7}
 fis_params = {'inference_engine':'product'}
 # note this alpha for CQL is different than CLIP's alpha
 cql_params = {
-    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50, 
+    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50,
     'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
     }
 
@@ -155,7 +155,7 @@ cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
 for idx, trajectory in enumerate(trajectories):
     X.append(trajectory[3])
-    
+
 train_X = np.array(X)
 cfql.fit(train_X, trajectories, ecm=True, Dthr=0.01, verbose=True)
 _, _, greedy_offline_rewards = play_cart_pole(env, cfql, 100)

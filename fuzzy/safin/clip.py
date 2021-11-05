@@ -9,7 +9,7 @@ Created on Tue Jul 27 12:21:50 2021
 import time
 import numpy as np
 
-from membership_functions import gaussian
+from fuzzy.common.membership_functions import gaussian
 
 def R(sigma_1, sigma_2):
     # regulator function

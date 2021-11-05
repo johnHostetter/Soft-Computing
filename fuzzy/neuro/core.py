@@ -8,7 +8,7 @@ Created on Fri Oct 22 23:19:15 2021
 
 import numpy as np
 
-from metrics import RMSE
+from fuzzy.common.metrics import RMSE
 
 class CoreNeuroFuzzy(object):
     """

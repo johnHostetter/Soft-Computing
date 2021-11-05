@@ -6,7 +6,7 @@ Created on Sat Oct 23 22:56:26 2021
 @author: john
 
     This code demonstrates the Fuzzy Rule-Based Q-Learning Algorithm.
-    It is corrected from the FQL code at the following link: 
+    It is corrected from the FQL code at the following link:
         https://github.com/seyedsaeidmasoumzadeh/Fuzzy-Q-Learning
 """
 
@@ -17,7 +17,7 @@ import itertools
 import functools
 import numpy as np
 
-from fis import Build
+from fuzzy.reinforcement.fis import Build
 
 GLOBAL_SEED = 0
 np.random.seed(GLOBAL_SEED)

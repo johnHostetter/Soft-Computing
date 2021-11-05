@@ -12,7 +12,7 @@ import torch
 import random
 import numpy as np
 
-from cfql import CFQLModel
+from fuzzy.reinforcement.cfql import CFQLModel
 
 SEED = 0
 os.environ['PYTHONHASHSEED']=str(SEED)
@@ -24,11 +24,11 @@ env = gym.make('LunarLander-v2')
 
 def lunar_lander(env, model=None):
     env = gym.make('LunarLander-v2')
-    
+
     print('Observation shape:', env.observation_space.shape)
     print('Action length:', env.action_space.n)
     action_set_length = env.action_space.n
-    
+
     final = []
     states = []
     trajectories = []
@@ -68,13 +68,13 @@ trajectories, random_rewards, _ = lunar_lander(env)
 X = [trajectories[0][0]]
 for idx, trajectory in enumerate(trajectories):
     X.append(trajectory[3])
-    
+
 train_X = np.array(X)
 clip_params = {'alpha':0.1, 'beta':0.7}
 fis_params = {'inference_engine':'product'}
 # note this alpha for CQL is different than CLIP's alpha
 cql_params = {
-    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50, 
+    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50,
     'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
     }
 cfql = CFQLModel(clip_params, fis_params, cql_params)

@@ -8,9 +8,10 @@ Created on Wed Apr 29 19:52:22 2020
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+
 from scipy.spatial import distance
 from collections import Counter
-from statistics import stdev 
+from statistics import stdev
 from neuro_fuzzy_network import Term, Variable, NFN_gaussianMembership
 
 #np.random.seed(0)
@@ -22,20 +23,20 @@ class EmpiricalFuzzySet():
         self.distances = np.array([])
         self.powers = np.array([])
         self.new_p_idxs = -1
-        
+
     def unimodalDensity(self, X, i, dist):
         """ Calculate the unimodal density of a particular ith data sample
         from the set of observations, X, with the distance metric, dist. """
         K = len(X)
         denominator = 0
-        
+
         if len(self.distances) == 0:
             print('Building matrices...')
             self.distances = np.array([float('inf')]*len(X)*len(X)).reshape(len(X), len(X))
             self.powers = np.array([float('inf')]*len(X)*len(X)).reshape(len(X), len(X))
             print('Done.')
             print('Standby for initialization...')
-        
+
         if self.numerator == None:
             self.numerator = 0
             for k in range(K):
@@ -44,29 +45,29 @@ class EmpiricalFuzzySet():
         for j in range(K):
             if self.distances[i, j] != float('inf') or self.distances[j, i] != float('inf'):
                 denominator += self.distances[i, j]
-            else:    
+            else:
                 self.distances[i, j] = dist(X[i], X[j])
                 self.powers[i, j] = pow(self.distances[i, j], 2)
                 self.distances[j, i] = self.distances[i, j]
                 self.powers[j, i] = self.powers[i, j]
                 denominator += self.powers[i, j]
-            
+
         denominator *= 2 * K
         return self.numerator / denominator
-    
+
     def unimodalDensity1(self, X, x, dist):
         """ Calculate the unimodal density of a particular ith data sample
         from the set of observations, X, with the distance metric, dist. """
         K = len(X)
         denominator = 0
-        
+
         if len(self.distances) == 0:
             print('Building matrices...')
             self.distances = np.array([float('inf')]*len(X)*len(X)).reshape(len(X), len(X))
             self.powers = np.array([float('inf')]*len(X)*len(X)).reshape(len(X), len(X))
             print('Done.')
             print('Standby for initialization...')
-        
+
         if self.numerator == None:
             self.numerator = 0
             for k in range(K):
@@ -74,7 +75,7 @@ class EmpiricalFuzzySet():
                     self.numerator += pow(dist(X[k], X[j]), 2)
         for j in range(K):
             denominator += pow(dist(x, X[j]), 2)
-            
+
         denominator *= 2 * K
         return self.numerator / denominator
 
@@ -85,7 +86,7 @@ class EmpiricalFuzzySet():
     #    idx = X.index(U[i])
         idx = i
         return F[i] * self.unimodalDensity(X, idx, dist)
-    
+
     def multimodalDensity1(self, X, x, dist):
         """ Calculate the multimodal density of a particular ith data sample
         from the set of observations, X, with the distance metric, dist, and
@@ -98,7 +99,7 @@ class EmpiricalFuzzySet():
         U = list(counter.keys()) # unique observations
         F = list(counter.values()) # frequencies
         return (U, F)
-    
+
     def plotDistribution(self, X, Y, title):
         plt.ticklabel_format(useOffset=False, style='plain')
         plt.title(title)
@@ -106,39 +107,39 @@ class EmpiricalFuzzySet():
         plt.ylabel('y')
         plt.plot(X, Y, 'o', color='blue')
         plt.legend()
-        
+
     def objectiveMethod(self, data):
         #X.sort()
         #U, F = unique(X)
         U = data.X
         F = np.array([1]*len(data.X))
-        
+
         x_lst = []
         y_lst = []
         densities = {}
-        
+
         # step 1
-        
+
         for i in range(len(U)):
             mm = self.multimodalDensity(data.X, U, F, i, distance.euclidean)
 #            print('%s/%s: %s' % (i, len(U), mm))
             densities[mm] = i # add the multimodal density to the set
             x_lst.append(U[i])
             y_lst.append(mm)
-            
+
         # step 2
-            
+
         maximum_multimodal_density = max(densities.keys()) # find the maximum multimodal density
         idx = densities[maximum_multimodal_density] # find the index of the unique data sample with the maximum multimodal density
         u1_star = U[idx] # find the unique data sample with the maximum multimodal density
-        
+
         # step 3
-        
+
         #U.pop(idx) # remove from the set of unique observations
         DMM = []
         ULstar = []
         uR = u1_star # assigned to but never used
-        
+
         ctr = 0
         visited = {}
         previousLeftIndex = 0
@@ -174,7 +175,7 @@ class EmpiricalFuzzySet():
         #    row = idx
         #    col = 0
         #    U = np.delete(U, row, col)
-        
+
         # step 8
         clouds = {} # each element is a list that is indexed by a prototype index
         labels = [] # a direct labeling where the ith element of X has an ith label
@@ -196,21 +197,21 @@ class EmpiricalFuzzySet():
                 clouds[min_idx] = []
                 clouds[min_idx].append(x)
         #    print(min_p)
-        
+
         # step 9
         p0 = {} # the centers of the prototypes
         for prototype_idx in clouds.keys():
             elements = clouds[prototype_idx]
             center = sum(elements) / len(elements)
             p0[prototype_idx] = center
-        
+
         # step 10
         dmm_p0 = {}
         for prototype_idx in p0.keys():
             dmm_p0[prototype_idx] = self.multimodalDensity1(data.X, p0[prototype_idx], distance.euclidean)
-            
+
         print('Calculating multimodal densities of prototypes and reducing number of prototypes...')
-            
+
         # step 11
         runAgain = True
         iteration = 0
@@ -230,7 +231,7 @@ class EmpiricalFuzzySet():
             sigma = stdev(ds)
             R = sigma * (1 - (sigma / eta))
             piN = {}
-            
+
             for i in p0.keys():
                 for j in p0.keys():
                     d = distance.euclidean(p0[j], p0[i])
@@ -240,7 +241,7 @@ class EmpiricalFuzzySet():
                         except KeyError:
                             piN[i] = []
                             piN[i].append(p0[j])
-            
+
             p1 = {}
             for i in p0.keys():
                 pi = p0[i]
@@ -251,15 +252,15 @@ class EmpiricalFuzzySet():
                         member = False
                 if member:
                     p1[i] = pi
-                    
+
 #            print(iteration)
             iteration += 1
 #            print('%s vs %s' % (len(p1.keys()), len(p0.keys())))
             runAgain = len(p1.keys()) < len(p0.keys()) # step 13
             p0 = p1 # step 12
-            
+
         print('Calculating final prototypes and creating data clouds...')
-        
+
         # step 14
         clouds = {} # each element is a list that is indexed by a prototype index
         labels = [] # a direct labeling where the ith element of X has an ith label
@@ -280,22 +281,22 @@ class EmpiricalFuzzySet():
             except KeyError:
                 clouds[min_idx] = []
                 clouds[min_idx].append(x)
-                        
+
         # additional steps required
         variables = self.make_variables(data, p0, clouds)
         return variables, clouds
-    
+
     def main(self, data):
         variables, clouds = self.objectiveMethod(data)
         self.compress_variables(clouds, variables)
         NFN_variables = self.make_NFN_variables(variables)
         return NFN_variables
-        
+
     def gaussianMembership(self, x, center, sigma):
         numerator = (-1) * pow(x - center, 2)
         denominator = 2 * pow(sigma, 2)
         return pow(math.e, numerator / denominator)
-    
+
     def mystdev(self, lst, i):
         """ Calculate the standard deviation of the ith feature
         from a list of observations that have been collected. """
@@ -303,7 +304,7 @@ class EmpiricalFuzzySet():
         for item in lst:
             new_lst.append(item[i])
         return stdev(np.array(new_lst))
-    
+
     def distMatrix(self, terms):
         matrix = np.array([float('inf')]*len(terms)*len(terms)).reshape(len(terms), len(terms))
         for i in terms.keys():
@@ -411,7 +412,7 @@ class EmpiricalFuzzySet():
 #            plt.show()
 
     # trying to incorporate empirical fuzzy sets into neuro fuzzy networks
-    
+
     def make_NFN_variables(self, variables):
         NFN_variables = [] # variables meant for the neuro fuzzy network
         term_labels = ['Very Negative', 'Negative', 'Slightly Negative', 'Moderate', 'Slightly Positive', 'Positive', 'Very Positive']
@@ -421,7 +422,7 @@ class EmpiricalFuzzySet():
             var_label = self.features[var_key]
             terms = []
             term_label_idx = 0
-            
+
             cs = []
             min_c = float('inf')
             max_c = -float('inf')
@@ -432,9 +433,9 @@ class EmpiricalFuzzySet():
                     min_c = c
                 elif c > max_c:
                     max_c = c
-                    
+
             print(cs)
-        
+
             for term_key in variables[var_key].keys():
                 c = variables[var_key][term_key]['center']
                 sig = variables[var_key][term_key]['sigma']
@@ -447,7 +448,7 @@ class EmpiricalFuzzySet():
                     r = True
                 params = {'center':c, 'sigma':sig, 'b':1, 'L':l, 'R':r}
                 term_label = term_labels[term_label_idx]
-                
+
                 func = NFN_gaussianMembership
 #                if c == min(cs):
 #                    params['b'] = 2
@@ -455,9 +456,9 @@ class EmpiricalFuzzySet():
 #                elif c == max(cs):
 #                    params['b'] = 2
 #                    func = NFN_generalBellShapedMembership
-                
+
                 term = Term(var_key, func, params, sup, term_label, var_label)
-                
+
                 term_label_idx += 1
                 terms.append(term)
             all_terms.append(terms)

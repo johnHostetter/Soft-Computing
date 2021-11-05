@@ -6,17 +6,16 @@ Created on Sat Oct 23 22:56:26 2021
 @author: john
 
     This code demonstrates the Conservative Fuzzy Rule-Based Q-Learning Algorithm.
-        
-    It is inspired by the FQL code at the following link: 
+
+    It is inspired by the FQL code at the following link:
         https://github.com/seyedsaeidmasoumzadeh/Fuzzy-Q-Learning
-    
+
     I have extended it with Tabular Conservative Q-Learning with code from:
         https://sites.google.com/view/offlinerltutorial-neurips2020/home
-    
+
 """
 
 import os
-import re
 import sys
 import time
 import copy
@@ -26,20 +25,39 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-try:
-    # get the current working directory, but only keep the parent folder (which is 'fuzzy')
-    path = re.split(r"\bfuzzy\b", os.getcwd(), 1)[0] + 'fuzzy'
-    # ignore any directory that has '.' in it (e.g. .gitignore)
-    directories = [folder for folder in os.listdir(path) if '.' not in folder]
-    
-    for directory in directories:
-        sys.path.append(path + '/' + directory)
-except FileNotFoundError:
-    pass
-    
-from ecm import ECM
-from clip import CLIP, rule_creation
-from adaptive import AdaptiveNeuroFuzzy
+# sys.path.insert(0, os.path.join(
+#     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib'
+#     ))
+
+# import apfrb
+# import common
+# import elf
+# import fql
+# import genetic
+# import scm
+# import frl
+# import denfis
+# import safin
+# import neuro
+# del sys.path[0]
+# del sys.path[0], sys, os
+
+# finding the parent directory automatically
+# parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# if parent_directory not in sys.path:
+#     sys.path.append(parent_directory)
+
+# from common.utilities import DirectoriesContextManager
+
+from fuzzy.reinforcement.cql import CQLModel
+from fuzzy.denfis.ecm import ECM
+from fuzzy.safin.clip import CLIP, rule_creation
+from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
+# with DirectoriesContextManager(parent_directory):
+#     from ecm import ECM
+#     from cql import CQLModel
+#     from clip import CLIP, rule_creation
+#     from adaptive import AdaptiveNeuroFuzzy
 
 GLOBAL_SEED = 0
 # 1. Set the `PYTHONHASHSEED` environment variable at a fixed value
@@ -54,74 +72,42 @@ np.random.seed(GLOBAL_SEED)
 # 4. Set the `torch` pseudo-random generator at a fixed value
 torch.manual_seed(GLOBAL_SEED)
 
-def one_hot_encoding(y, n_dims=None):
-    """ Take integer y (tensor or variable) with n dims and convert it to 1-hot representation with n+1 dims. """
-    y_tensor = y.view(-1, 1)
-    n_dims = n_dims if n_dims is not None else int(torch.max(y_tensor)) + 1
-    y_one_hot = torch.zeros(
-        y_tensor.size()[0], n_dims).scatter_(1, y_tensor, 1)
-    y_one_hot = y_one_hot.view(*y.shape, -1)
-    return y_one_hot
-
-class TabularNetwork(torch.nn.Module):
-    def __init__(self, num_states, num_actions):
-        super(TabularNetwork, self).__init__()
-        self.num_states = num_states
-        self.network = torch.nn.Sequential(
-            torch.nn.Linear(self.num_states, num_actions)
-        )
-
-    def forward(self, states):
-        onehot = one_hot_encoding(states, self.num_states)
-        return self.network(onehot)
-
-def get_tensors(list_of_tensors, list_of_indices):
-    s, a, ns, r = [], [], [], []
-    for idx in list_of_indices:
-        s.append(list_of_tensors[idx][0])
-        a.append(list_of_tensors[idx][1])
-        r.append(list_of_tensors[idx][2])
-        ns.append(list_of_tensors[idx][3])
-    s = np.array(s)
-    a = np.array(a)
-    ns = np.array(ns)
-    r = np.array(r)
-    return s, a, ns, r
-
-class CFQLModel(AdaptiveNeuroFuzzy):
+class CFQLModel(AdaptiveNeuroFuzzy, CQLModel):
     def __init__(self, clip_params, fis_params, cql_params):
-        super().__init__()
-        
+        # super().__init__()
+        AdaptiveNeuroFuzzy.__init__(self)
+        CQLModel.__init__(self, cql_params)
+
         self.current_rule_activations = []
-        
+
         # the alpha parameter for the CLIP algorithm
         self.alpha = clip_params['alpha']
         # the beta parameter for the CLIP algorithm
         self.beta = clip_params['beta']
-        
+
         # the inference engine to use for fuzzy logic control
         self.inference_engine = fis_params['inference_engine']
-        
-        # discount for future reward
-        self.gamma = cql_params['gamma']
-        # the alpha parameter used in CQL, value of weight on the CQL coefficient
-        self.cql_alpha = cql_params['alpha']
-        self.batch_size = cql_params['batch_size']  # the batch size of CQL
-        # the number of gradient steps used for projection
-        self.number_of_batches = cql_params['batches']
-        # the learning rate of CQL
-        self.learning_rate = cql_params['learning_rate']
-        # the number of CQL iterations to run
-        self.number_of_iterations = cql_params['iterations']
-        # the action set length of the environment
-        self.action_set_length = cql_params['action_set_length']
+
+        # # discount for future reward
+        # self.gamma = cql_params['gamma']
+        # # the alpha parameter used in CQL, value of weight on the CQL coefficient
+        # self.cql_alpha = cql_params['alpha']
+        # self.batch_size = cql_params['batch_size']  # the batch size of CQL
+        # # the number of gradient steps used for projection
+        # self.number_of_batches = cql_params['batches']
+        # # the learning rate of CQL
+        # self.learning_rate = cql_params['learning_rate']
+        # # the number of CQL iterations to run
+        # self.number_of_iterations = cql_params['iterations']
+        # # the action set length of the environment
+        # self.action_set_length = cql_params['action_set_length']
 
     def d(self, x):
         return self.truth_value(x).sum()
 
     def infer(self, x):
         """
-        A custom fuzzy inference procedure, that uses the current rule activations 
+        A custom fuzzy inference procedure, that uses the current rule activations
         to weigh their corresponding rule's Q-values.
 
         Parameters
@@ -189,75 +175,6 @@ class CFQLModel(AdaptiveNeuroFuzzy):
         q_values = self.infer(state)
         return np.argmax(q_values)
 
-    def q_backup_sparse_sampled(self, q_values, state_index, action_index,
-                                next_state_index, reward, rule_weights):
-        next_state_q_values = q_values[next_state_index, :]
-        values = np.max(next_state_q_values, axis=-1)
-        target_value = (reward + self.gamma * values)
-        return target_value
-
-    def project_qvalues_cql_sampled(self, state_index, action_index, target_values, rule_weights=None):
-        # train with a sampled dataset
-        target_qvalues = torch.tensor(target_values, dtype=torch.float32)
-        state_index = torch.tensor(state_index, dtype=torch.int64)
-        action_index = torch.tensor(action_index, dtype=torch.int64)
-        pred_qvalues = self.network(state_index)
-        logsumexp_qvalues = torch.logsumexp(pred_qvalues, dim=-1)
-
-        pred_qvalues = pred_qvalues.gather(
-            1, action_index.reshape(-1, 1)).squeeze()
-        cql_loss = logsumexp_qvalues - pred_qvalues
-
-        loss = torch.mean((pred_qvalues - target_qvalues)**2)
-        # loss = torch.mean(torch.tensor(rule_weights) * ((pred_qvalues - target_qvalues)**2))
-        loss = loss + self.cql_alpha * torch.mean(cql_loss)
-
-        self.network.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        number_of_states = self.get_number_of_rules()
-        pred_qvalues = self.network(torch.arange(number_of_states))
-        return pred_qvalues.detach().numpy()
-
-    def conservative_q_iteration(self, sampled=False, training_dataset=None, rule_weights=None, **kwargs):
-        """
-        Runs Conservative Q-iteration.
-
-        Args:
-          sampled (bool): Whether to use sampled datasets for training or not.
-          training_dataset (list): list of (s, a, r, ns) pairs
-          rule_weights (list): list of the rule activations where the i'th observation's current state (s) 
-              correponds to the i'th element of rule_weights
-        """
-
-        number_of_states = self.get_number_of_rules()
-        number_of_actions = self.action_set_length
-
-        q_values = np.zeros((number_of_states, number_of_actions))
-        for i in range(self.number_of_iterations):
-            if sampled:
-                for j in range(self.number_of_batches):
-                    training_idx = np.random.choice(np.arange(
-                        len(training_dataset)), size=self.batch_size)  # batch size was 256, then 1028
-                    state_index, action_index, next_state, reward = get_tensors(
-                        training_dataset, training_idx)
-
-                    rule_weights_sample = np.array(rule_weights)[training_idx]
-
-                    target_values = self.q_backup_sparse_sampled(q_values, state_index, action_index,
-                                                                 next_state, reward, rule_weights_sample, **kwargs)
-
-                    intermediate_values = self.project_qvalues_cql_sampled(state_index, action_index,
-                                                                           target_values, rule_weights=rule_weights_sample)
-                    if j == self.number_of_batches - 1:
-                        q_values = intermediate_values
-            else:
-                raise Exception(
-                    "The online version of Conservative Fuzzy Q-Learning is not yet available.")
-        self.q_table = q_values
-        return self.q_table
-
     def export_antecedents(self):
         """
         Export the antecedent terms for each input variable of the Neuro-Fuzzy network into a Pandas DataFrame representation.
@@ -296,7 +213,7 @@ class CFQLModel(AdaptiveNeuroFuzzy):
 
     def export_q_values(self):
         """
-        Export the Q-values for each fuzzy logic rule of the Neuro-Fuzzy network into a Pandas DataFrame representation. 
+        Export the Q-values for each fuzzy logic rule of the Neuro-Fuzzy network into a Pandas DataFrame representation.
         The i'th row corresponds to the i'th fuzzy logic rule in the Neuro-Fuzzy network (order matters).
         The j'th column corresponds to the j'th possible action's Q-value.
 
@@ -310,7 +227,7 @@ class CFQLModel(AdaptiveNeuroFuzzy):
 
     def export_rules(self):
         """
-        Export the fuzzy logic rules of the Neuro-Fuzzy network into a Pandas DataFrame representation.        
+        Export the fuzzy logic rules of the Neuro-Fuzzy network into a Pandas DataFrame representation.
 
         Returns
         -------
@@ -330,7 +247,7 @@ class CFQLModel(AdaptiveNeuroFuzzy):
             The name of a file or file path to use in saving the Neuro-Fuzzy network.
             Should not include the '_q_values.csv', '_rules.csv', '_antecedents.csv', etc. extensions.
             These are automatically appended by the 'save' function.
-            
+
         Returns
         -------
         None.
@@ -444,11 +361,11 @@ class CFQLModel(AdaptiveNeuroFuzzy):
         Dthr : float, optional
             The distance threshold for the ECM algorithm; only matters if ECM is enabled. The default is 1e-3.
         prune_rules : boolean, optional
-            This boolean controls whether to further prune the candidate rules. The rule pruning strategy is removing all 
+            This boolean controls whether to further prune the candidate rules. The rule pruning strategy is removing all
             rules that are activated less than the average rule degree activation. If the 'ECM' algorithm and 'prune_rules'
             are both False, then the candidate rule generation procedure is the Wang and Mendel approach. The default is False.
         apfrb_sensitivity_analysis : boolean, optional
-            Enables a post-hoc sensitivity analysis of the fuzzy logic rules using the procedure introduced in the APFRB paper. 
+            Enables a post-hoc sensitivity analysis of the fuzzy logic rules using the procedure introduced in the APFRB paper.
             The default is False.
         verbose : boolean, optional
             If enabled (True), the execution of this function will print out step-by-step to show progress. The default is False.
@@ -566,10 +483,11 @@ class CFQLModel(AdaptiveNeuroFuzzy):
                     'done; removal of fuzzy logic rules has been reflected in the Neuro-Fuzzy network.')
 
         # prepare the Q-table
-        self.network = TabularNetwork(self.get_number_of_rules(),
-                                      self.action_set_length)
-        self.optimizer = torch.optim.Adam(
-            self.network.parameters(), lr=self.learning_rate)
+        self.build_q_table(self.get_number_of_rules())
+        # self.network = TabularNetwork(self.get_number_of_rules(),
+        #                               self.action_set_length)
+        # self.optimizer = torch.optim.Adam(
+        #     self.network.parameters(), lr=self.learning_rate)
 
         if verbose:
             print('\nTransforming the trajectories to a compatible format...')

@@ -10,9 +10,9 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fql import FQLModel
-from cfql import CFQLModel
-from fis import InputStateVariable, Trapeziums, Build
+from fuzzy.reinforcement.fql import FQLModel
+from fuzzy.reinforcement.cfql import CFQLModel
+from fuzzy.reinforcement.fis import InputStateVariable, Trapeziums, Build
 
 GLOBAL_SEED = 1
 LOCAL_SEED = 42
@@ -68,11 +68,11 @@ def play_mountain_car(model, max_eps=100, render=False):
                       ' epsilon=', 0.0, ' best mean eps=', epsilon)
             iteration += 1
             r = 0
-                
+
         # render the environment for the last couple episodes
         if render and iteration + 1 > (max_eps - 6):
             env.render()
-        
+
         prev_state = state_value
         state_value, reward, done, _ = env.step(action)
         visited_states.append(state_value)
@@ -81,7 +81,7 @@ def play_mountain_car(model, max_eps=100, render=False):
         if reward == 0:
             reward = -1
         action = model.get_action(state_value)
-        
+
         r += reward
         # Reach to 2000 steps --> done
         if r <= -2000:
@@ -95,9 +95,9 @@ def play_mountain_car(model, max_eps=100, render=False):
     plt.plot(best_mean_rewards[1:])
     plt.ylabel('Rewards')
     plt.show()
-    
+
     env.close()
-    
+
     return model, np.array(visited_states), trajectories, rewards
 
 def random_play_mountain_car(model=None, max_eps=500):
@@ -193,7 +193,7 @@ def train_env(model=None, max_eps=500):
     return model, trajectories, rewards
 
 # 10 episodes also works, but some interactions will still require ~2000 time-steps
-model, trajectories, _ = train_env(max_eps=15)
+model, trajectories, _ = train_env(max_eps=10)
 # _, trajectories, _ = random_play_mountain_car(max_eps=100)
 
 env, fis = get_fis_env()
@@ -204,7 +204,7 @@ clip_params = {'alpha':0.1, 'beta':0.7}
 fis_params = {'inference_engine':'product'}
 # note this alpha for CQL is different than CLIP's alpha
 cql_params = {
-    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50, 
+    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50,
     'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
     }
 cfql = CFQLModel(clip_params, fis_params, cql_params)
@@ -212,7 +212,7 @@ new_cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
 for idx, trajectory in enumerate(trajectories):
     X.append(trajectory[3])
-    
+
 train_X = np.array(X)
 cfql.fit(train_X, trajectories, ecm=True, Dthr=0.01, verbose=True)
 _, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100, False)
