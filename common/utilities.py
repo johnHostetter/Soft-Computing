@@ -6,6 +6,8 @@ Created on Wed Nov  3 18:50:11 2021
 @author: john
 """
 
+import os
+import sys
 import numpy as np
 
 def boolean_indexing(v, fillval=np.nan):
@@ -32,3 +34,27 @@ def boolean_indexing(v, fillval=np.nan):
     out = np.full(mask.shape, fillval)
     out[mask] = np.concatenate(v)
     return out
+
+class DirectoriesContextManager(object):
+    # https://stackoverflow.com/questions/17211078/how-to-temporarily-modify-sys-path-in-python 
+    def __init__(self, path):
+        self.path = path
+    
+    def __enter__(self):
+        try:
+            # ignore any directory that has '.' in it (e.g. .gitignore)
+            self.directories = [folder for folder in os.listdir(self.path) if '.' not in folder]
+            
+            for directory in self.directories:
+                if directory not in sys.path:
+                    sys.path.append(self.path + '/' + directory)
+        except FileNotFoundError:
+            pass
+        
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            for directory in self.directories:
+                if directory not in sys.path:
+                    sys.path.remove(self.path + '/' + directory)
+        except ValueError:
+            pass
