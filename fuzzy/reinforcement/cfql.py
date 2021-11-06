@@ -25,10 +25,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from fuzzy.reinforcement.cql import CQLModel
 from fuzzy.denfis.ecm import ECM
-from fuzzy.self_adaptive.clip import CLIP, rule_creation
+from fuzzy.reinforcement.cql import CQLModel
 from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
+from fuzzy.self_adaptive.clip import CLIP, rule_creation
 
 GLOBAL_SEED = 0
 # 1. Set the `PYTHONHASHSEED` environment variable at a fixed value
@@ -58,20 +58,6 @@ class CFQLModel(AdaptiveNeuroFuzzy, CQLModel):
 
         # the inference engine to use for fuzzy logic control
         self.inference_engine = fis_params['inference_engine']
-
-        # # discount for future reward
-        # self.gamma = cql_params['gamma']
-        # # the alpha parameter used in CQL, value of weight on the CQL coefficient
-        # self.cql_alpha = cql_params['alpha']
-        # self.batch_size = cql_params['batch_size']  # the batch size of CQL
-        # # the number of gradient steps used for projection
-        # self.number_of_batches = cql_params['batches']
-        # # the learning rate of CQL
-        # self.learning_rate = cql_params['learning_rate']
-        # # the number of CQL iterations to run
-        # self.number_of_iterations = cql_params['iterations']
-        # # the action set length of the environment
-        # self.action_set_length = cql_params['action_set_length']
 
     def d(self, x):
         return self.truth_value(x).sum()
@@ -454,10 +440,6 @@ class CFQLModel(AdaptiveNeuroFuzzy, CQLModel):
 
         # prepare the Q-table
         self.build_q_table(self.get_number_of_rules())
-        # self.network = TabularNetwork(self.get_number_of_rules(),
-        #                               self.action_set_length)
-        # self.optimizer = torch.optim.Adam(
-        #     self.network.parameters(), lr=self.learning_rate)
 
         if verbose:
             print('\nTransforming the trajectories to a compatible format...')
