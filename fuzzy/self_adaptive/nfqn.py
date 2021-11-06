@@ -16,9 +16,9 @@ import numpy as np
 
 from copy import copy, deepcopy
 
-from fuzzy.safin.fuzzy import Build
-from fuzzy.safin.clip import CLIP, rule_creation
-from fuzzy.safin.nfn import AdaptiveNeuroFuzzy
+from fuzzy.self_adaptive.fuzz import Build
+from fuzzy.self_adaptive.clip import CLIP, rule_creation
+from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
 
 class NeuroFuzzyQNetwork(AdaptiveNeuroFuzzy):
     """

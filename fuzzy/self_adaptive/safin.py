@@ -12,8 +12,8 @@ import numpy as np
 
 from copy import deepcopy
 
-from safin.fuzzy.nfn import ModifyRulesNeuroFuzzy
-from safin.fuzzy.clip import CLIP, rule_creation
+from fuzzy.self_adaptive.clip import CLIP, rule_creation
+from fuzzy.neuro.genetic_nfn import ModifyRulesNeuroFuzzy
 
 # SaFIN technically can only use AdaptiveNeuroFuzzy, but I use ModifyRulesNeuroFuzzy instead to test rule pruning functionality on Boston dataset
 class SaFIN(ModifyRulesNeuroFuzzy):

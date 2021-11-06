@@ -10,10 +10,10 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fuzzy.safin.fuzzy import InputStateVariable
-from fuzzy.safin.fuzzy import Trapeziums, Gaussian
-from fuzzy.safin.fuzzy import Build
-from fuzzy.safin.nfqn import NeuroFuzzyQNetwork as FQLModel
+from fuzzy.self_adaptive.fuzzy import InputStateVariable
+from fuzzy.self_adaptive.fuzzy import Trapeziums, Gaussian
+from fuzzy.self_adaptive.fuzzy import Build
+from fuzzy.self_adaptive.nfqn import NeuroFuzzyQNetwork as FQLModel
 
 GLOBAL_SEED = 1
 LOCAL_SEED = 42

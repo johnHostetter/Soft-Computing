@@ -11,13 +11,12 @@ Created on Sat Oct  9 21:56:59 2021
 import os
 import gym
 import time
-import copy
 import torch
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fuzzy.safin.safin import SaFIN
+from fuzzy.self_adaptive.safin import SaFIN
 
 # seed 10 worked very well (solved), 11, 12, 14 did not work at all (not solved)
 # seed 13 worked okay but then got suboptimal (~65.61)

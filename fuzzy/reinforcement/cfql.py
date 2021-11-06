@@ -300,7 +300,6 @@ class CFQLModel(AdaptiveNeuroFuzzy, CQLModel):
         current_input_variable_index = 0
         current_input_variable_antecedents = []
         for antecedent in antecedents:
-            print(antecedent)
             if antecedent['input_variable'] == current_input_variable_index:
                 current_input_variable_antecedents.append(antecedent)
             else:

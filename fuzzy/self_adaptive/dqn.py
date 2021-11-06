@@ -6,19 +6,14 @@ Created on Sat Oct  9 22:30:33 2021
 @author: john
 """
 
-import gym
 import copy
 import torch
-from torch.autograd import Variable
 import random
-import matplotlib.pyplot as plt
-# from PIL import Image
-# from IPython.display import clear_output
-# import math
-# import torchvision.transforms as T
 import numpy as np
 
-from fuzzy.safin.safin import SaFIN
+from torch.autograd import Variable
+
+from fuzzy.self_adaptive.safin import SaFIN
 
 class DQN():
     ''' Deep Q Neural Network class. '''

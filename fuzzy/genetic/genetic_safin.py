@@ -10,9 +10,9 @@ import time
 import numpy as np
 
 # genetic algorithm search of the one max optimization problem
-from numpy.random import randint
-from numpy.random import rand
 from copy import deepcopy
+from numpy.random import rand
+from numpy.random import randint
 
 # objective function
 def objective(rule_indices, model, X, Y):
@@ -78,7 +78,7 @@ def mutation(bitstring, r_mut):
 # genetic algorithm
 def genetic_algorithm(objective, probabilities, n_bits, n_iter, n_pop, r_cross, r_mut):
     # initial population of random bitstring
-    # population = [randint(0, 2, n_bits).tolist() for _ in range(n_pop)]   
+    # population = [randint(0, 2, n_bits).tolist() for _ in range(n_pop)]
     # weighted population
     population = []
     for _ in range(n_pop):
@@ -90,7 +90,7 @@ def genetic_algorithm(objective, probabilities, n_bits, n_iter, n_pop, r_cross, 
     # keep track of best solution
     best, best_eval = 0, objective(population[0])
     best = population[best] # get the 0'th candidate if there is no best result from generations
-    
+
     # enumerate generations
     for generation in range(n_iter):
         print(generation)

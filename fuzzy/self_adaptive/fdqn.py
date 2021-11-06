@@ -10,7 +10,7 @@ import torch
 import random
 import numpy as np
 
-from fuzzy.safin.nfqn import NeuroFuzzyQNetwork
+from fuzzy.self_adaptive.nfqn import NeuroFuzzyQNetwork
 
 class FuzzyDQN():
     ''' A Self Organizing Mamdani Neuro-Fuzzy Q-Network '''

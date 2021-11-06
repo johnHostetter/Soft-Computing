@@ -12,7 +12,7 @@ from copy import deepcopy
 from functools import partial
 
 from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
-from fuzzy.safin.genetic_safin import objective, genetic_algorithm
+from fuzzy.genetic.genetic_safin import objective, genetic_algorithm
 
 class ModifyRulesNeuroFuzzy(AdaptiveNeuroFuzzy):
     def rule_selection(self, rule_indices_to_keep):

@@ -6,7 +6,7 @@ Created on Sat Oct 23 17:59:38 2021
 @author: john
 """
 
-from fuzzy.safin.clip import gaussian
+from fuzzy.common.membership_functions import gaussian
 
 class InputStateVariable(object):
     fuzzy_set_list = []
