@@ -10,7 +10,7 @@ import numpy as np
 
 from sklearn.datasets import load_boston
 
-from fuzzy.safin.safin import SaFIN
+from fuzzy.self_adaptive.safin import SaFIN
 
 def main():
     boston = load_boston()

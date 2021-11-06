@@ -25,39 +25,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# sys.path.insert(0, os.path.join(
-#     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib'
-#     ))
-
-# import apfrb
-# import common
-# import elf
-# import fql
-# import genetic
-# import scm
-# import frl
-# import denfis
-# import safin
-# import neuro
-# del sys.path[0]
-# del sys.path[0], sys, os
-
-# finding the parent directory automatically
-# parent_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# if parent_directory not in sys.path:
-#     sys.path.append(parent_directory)
-
-# from common.utilities import DirectoriesContextManager
-
 from fuzzy.reinforcement.cql import CQLModel
 from fuzzy.denfis.ecm import ECM
-from fuzzy.safin.clip import CLIP, rule_creation
+from fuzzy.self_adaptive.clip import CLIP, rule_creation
 from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
-# with DirectoriesContextManager(parent_directory):
-#     from ecm import ECM
-#     from cql import CQLModel
-#     from clip import CLIP, rule_creation
-#     from adaptive import AdaptiveNeuroFuzzy
 
 GLOBAL_SEED = 0
 # 1. Set the `PYTHONHASHSEED` environment variable at a fixed value

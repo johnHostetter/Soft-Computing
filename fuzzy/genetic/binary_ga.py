@@ -7,8 +7,8 @@ Created on Mon Oct 11 13:21:34 2021
 """
 
 # genetic algorithm search of the one max optimization problem
-from numpy.random import randint
 from numpy.random import rand
+from numpy.random import randint
 
 # objective function
 def onemax(x):

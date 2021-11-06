@@ -6,8 +6,8 @@ Created on Mon Oct 11 13:15:08 2021
 @author: john
 """
 
-import numpy
 import ga
+import numpy
 
 """
 The y=target is to maximize this equation ASAP:
@@ -58,9 +58,9 @@ for generation in range(num_generations):
     best_outputs.append(numpy.max(numpy.sum(new_population*equation_inputs, axis=1)))
     # The best result in the current iteration.
     print("Best result : ", numpy.max(numpy.sum(new_population*equation_inputs, axis=1)))
-    
+
     # Selecting the best parents in the population for mating.
-    parents = ga.select_mating_pool(new_population, fitness, 
+    parents = ga.select_mating_pool(new_population, fitness,
                                       num_parents_mating)
     print("Parents")
     print(parents)
@@ -79,7 +79,7 @@ for generation in range(num_generations):
     # Creating the new population based on the parents and offspring.
     new_population[0:parents.shape[0], :] = parents
     new_population[parents.shape[0]:, :] = offspring_mutation
-    
+
 # Getting the best solution after iterating finishing all generations.
 #At first, the fitness is calculated for each solution in the final generation.
 fitness = ga.cal_pop_fitness(equation_inputs, new_population)
