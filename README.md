@@ -6,32 +6,35 @@ Steps on how the project was structured to handle the imports:
 
 1. Add a setup.py to the root folder (i.e. "soft_computing")
 2. Use a virtual environment
-    1. Create virtual environment (Linux)<br>
+    1. Create virtual environment INSIDE the "soft_computing" folder (Linux)<br>
     <code>python -m venv venv</code>
     2. Activate virtual environment (Linux)<br>
     <code>. venv/bin/activate</code>
-    3. Deactivate virtual environment (Linux)<br>
+    3. Deactivate virtual environment when you are done (Linux)<br>
     <code>deactivate</code>
-3. Pip install your project in an editable state
+3. Pip install your project in an editable state, this lets you access code from the other folders (e.g. code inside "apfrb" can use code from "common")
     1. In the root directory (i.e. "soft_computing"), run:<br>
     <code>pip install -e .</code><br>
     Note the dot, it stands for "current directory". The -e flag installs the project in an editable state. This means that edits to the .py files will be automatically included in the installed package
     2. Verify installation by running:<br>
     <code>pip freeze</code>
-4. Import by prepending the "main folder" to every import. An example of this is the "fuzzy" directory that is within "soft_computing".
-5. To run the code from a terminal:
+4. Read this if you just created a new virtual environment: You will need to pip install all the necessary libraries for the library to work (e.g. "numpy", "sklearn", etc.).
+5. Import by prepending the "main folder" to every import. An example of this is the "fuzzy" directory that is within "soft_computing".
+6. To run the code from a terminal:
     1. Open a terminal and have the current working directory as the root folder of this project (i.e. "soft_computing").
-    2. Activate the virtual environment with the above code.
+    2. Activate the virtual environment, "venv", with the above code.
     3. After activating the virtual environment, one may then execute scripts by following this convention:<br>
-    <code>python3 ./fuzzy/safin/boston_example.py</code>
+    <code>python3 ./fuzzy/self_adaptive/boston_example.py</code>
+    However, some script files only contain function definitions, so they may not appear to do anything.
 6. To run the code from an IDE (e.g. Spyder):
     1. If instead, code is to be run in an IDE such as Spyder. First, [a separate virtual environment will need to be made by using Anaconda](https://stackoverflow.com/questions/34217175/spyder-does-not-run-in-anaconda-virtual-environment-on-windows-10). Second, [the Python interpreter will need to be updated](https://stackoverflow.com/questions/30170468/how-to-run-spyder-in-virtual-environment).
     2. To create a virtual environment using Anaconda (note that this is a different virtual environment than what was made above), the following code should be run in a terminal:<br>
     <code>conda create -n env python=3.8 spyder</code><br>
+    Note: If you get a warning running the above code, that says a conda environment already exists at "...", then no need to create a new conda environment.
     At the time of writing, Python 3.8.5 is being used, but this will likely be different in the future.
     3. The Anaconda virtual environment is then activated by running:<br>
     <code>conda activate env</code><br>
-    Do not use the "venv" virtual environment. Use the "env" virtual environment.
+    Do not use the "venv" virtual environment. Use the "env" conda virtual environment.
     4. Launch Spyder from the terminal where the Anaconda virtual environment is already activated, and the current working directory is the root of this project (i.e. "soft_computing") by simply entering:<br>
     <code>spyder</code><br>
     <strong>The following steps are now obsolete, but are left as a precautionary measure.</strong>
