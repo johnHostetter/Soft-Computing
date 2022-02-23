@@ -10,6 +10,7 @@ import numpy as np
 
 from fuzzy.common.metrics import RMSE
 
+
 class CoreNeuroFuzzy(object):
     """
         Contains core neuro-fuzzy network functionality.
@@ -61,18 +62,18 @@ class CoreNeuroFuzzy(object):
             has a shape of (number of observations, number of all antecedents).
 
         """
-        activations = np.dot(o1, self.W_1) # the shape is (num of inputs, num of all antecedents)
+        activations = np.dot(o1, self.W_1)  # the shape is (num of inputs, num of all antecedents)
         
         flat_centers = self.term_dict['antecedent_centers'].flatten()
-        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_centers = flat_centers[~np.isnan(flat_centers)]  # get rid of the stored np.nan values
         flat_widths = self.term_dict['antecedent_widths'].flatten()
-        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
 
         denominator = np.power(flat_widths, 2)
-        denominator = np.where(denominator == 0.0, np.finfo(np.float).eps, denominator) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        denominator = np.where(denominator == 0.0, np.finfo(np.float).eps, denominator)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
         self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / denominator))
             
-        return self.f2 # shape is (num of inputs, num of all antecedents)
+        return self.f2  # shape is (num of inputs, num of all antecedents)
     
     def rule_base_layer(self, o2, inference='minimum'):     
         """
@@ -91,11 +92,11 @@ class CoreNeuroFuzzy(object):
             has a shape of (number of observations, number of rules).
 
         """
-        rule_activations = np.swapaxes(np.multiply(o2, self.W_2.T[:, np.newaxis]), 0, 1) # the shape is (num of observations, num of rules, num of antecedents)
+        rule_activations = np.swapaxes(np.multiply(o2, self.W_2.T[:, np.newaxis]), 0, 1)  # the shape is (num of observations, num of rules, num of antecedents)
         if inference == 'minimum':
-            self.f3 = np.nanmin(rule_activations, axis=2) # the shape is (num of observations, num of rules)
+            self.f3 = np.nanmin(rule_activations, axis=2)  # the shape is (num of observations, num of rules)
         elif inference == 'product':
-            self.f3 = np.nanprod(rule_activations, axis=2) # the shape is (num of observations, num of rules)
+            self.f3 = np.nanprod(rule_activations, axis=2)  # the shape is (num of observations, num of rules)
         return self.f3
     
     def consequence_layer(self, o3):   
@@ -139,16 +140,16 @@ class CoreNeuroFuzzy(object):
         temp_transformation = np.swapaxes(np.multiply(o4, self.W_4.T[:, np.newaxis]), 0, 1)
         
         flat_centers = self.term_dict['consequent_centers'].flatten()
-        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_centers = flat_centers[~np.isnan(flat_centers)]  # get rid of the stored np.nan values
         flat_widths = self.term_dict['consequent_widths'].flatten()
-        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
         
         numerator = np.nansum((temp_transformation * flat_centers * flat_widths), axis=2)
         denominator = np.nansum((temp_transformation * flat_widths), axis=2)
         self.f5 = numerator / denominator
         if np.isnan(self.f5).any():
             raise Exception()
-            self.f5[np.isnan(self.f5)] = 0.0 # nan values may appear if no rule in the rule base is applicable to an observation, zero out the nan values
+            self.f5[np.isnan(self.f5)] = 0.0  # nan values may appear if no rule in the rule base is applicable to an observation, zero out the nan values
         return self.f5
 
     def feedforward(self, X):
@@ -227,20 +228,20 @@ class CoreNeuroFuzzy(object):
         
         # (1) calculating the error signal in the output layer
         
-        e5_m = y - self.o5 # y actual minus y predicted
-        # e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node, shape is (num of observations, num of output nodes)
-        e5 = np.multiply(e5_m[:,:,np.newaxis], self.W_4.T) # shape is (num of observations, num of output nodes, num of output terms)
+        e5_m = y - self.o5  # y actual minus y predicted
+        # e5 = np.dot(e5_m, self.W_4.T)  # assign the error to its corresponding output node, shape is (num of observations, num of output nodes)
+        e5 = np.multiply(e5_m[:, :, np.newaxis], self.W_4.T)  # shape is (num of observations, num of output nodes, num of output terms)
         error = (self.o4 * e5.sum(axis=1))
         
         # delta centers
         flat_centers = self.term_dict['consequent_centers'].flatten()
-        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_centers = flat_centers[~np.isnan(flat_centers)]  # get rid of the stored np.nan values
         flat_widths = self.term_dict['consequent_widths'].flatten()
-        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
         # y4_k = (centers * self.W_4.T)
         # numerator = (widths * y4_k)
-        widths = np.multiply(flat_widths[:,np.newaxis], self.W_4).T
-        num = np.multiply(widths[np.newaxis,:,:], self.o4[:, np.newaxis,:])
+        widths = np.multiply(flat_widths[:, np.newaxis], self.W_4).T
+        num = np.multiply(widths[np.newaxis, :, :], self.o4[:, np.newaxis, :])
         den = np.power(num.sum(axis=2), 2)
         consequent_delta_c = e5.sum(axis=1) * (num / den[:, :, np.newaxis]).sum(axis=1)
         
@@ -257,21 +258,21 @@ class CoreNeuroFuzzy(object):
         # consequent_delta_widths = division.sum(axis=1)
         
         # between consequents and outputs
-        tmp = np.zeros((x.shape[0], self.Q, self.total_consequents)) # should be the same shape as self.W_4.T, but it is (num of observations, num of output nodes, num of output terms)
+        tmp = np.zeros((x.shape[0], self.Q, self.total_consequents))  # should be the same shape as self.W_4.T, but it is (num of observations, num of output nodes, num of output terms)
         # start_idx = 0
         # for q in range(self.Q):
         #     end_idx = start_idx + self.L[q]
         #     W_4[start_idx:end_idx, q] = 1
         #     start_idx = end_idx
         
-        y_lk = np.swapaxes(self.o4[:,:,np.newaxis] * self.W_4, 1, 2) # shape is (num of observations, num of output nodes, num of output terms)
-        c_lk = np.multiply(flat_centers[:,np.newaxis], self.W_4).T
-        lhs_term = (y_lk * widths[np.newaxis,:,:])
-        rhs_term = (y_lk * widths[np.newaxis,:,:] * c_lk[np.newaxis,:,:])
-        for q in range(self.Q): # iterate over the output nodes
-            for k in range(self.total_consequents): # iterate over their terms
+        y_lk = np.swapaxes(self.o4[:, :, np.newaxis] * self.W_4, 1, 2)  # shape is (num of observations, num of output nodes, num of output terms)
+        c_lk = np.multiply(flat_centers[:, np.newaxis], self.W_4).T
+        lhs_term = (y_lk * widths[np.newaxis, :, :])
+        rhs_term = (y_lk * widths[np.newaxis, :, :] * c_lk[np.newaxis, :, :])
+        for q in range(self.Q):  # iterate over the output nodes
+            for k in range(self.total_consequents):  # iterate over their terms
                 if self.W_4.T[q, k] == 1:
-                    val = ((y_lk[:, q, k])[:,np.newaxis] * ((c_lk[q, k] * lhs_term.sum(axis=2)) - rhs_term.sum(axis=2)))
+                    val = ((y_lk[:, q, k])[:, np.newaxis] * ((c_lk[q, k] * lhs_term.sum(axis=2)) - rhs_term.sum(axis=2)))
                     val /= np.power(lhs_term.sum(axis=2), 2)
                     tmp[:, q, k] = val[:, q]
                     

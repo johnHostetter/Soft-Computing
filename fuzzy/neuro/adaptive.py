@@ -12,6 +12,7 @@ import numpy as np
 from fuzzy.neuro.core import CoreNeuroFuzzy
 from fuzzy.common.utilities import boolean_indexing
     
+
 class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
     """
         Contains functions necessary for neuro-fuzzy network creation and adaptability.
@@ -58,8 +59,8 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
     """
     def __init__(self):
         CoreNeuroFuzzy.__init__(self)
-        self.rules = [] # the fuzzy logic rules
-        self.weights = [] # the weights corresponding to the rules, the i'th weight is associated with the i'th rule
+        self.rules = []  # the fuzzy logic rules
+        self.weights = []  # the weights corresponding to the rules, the i'th weight is associated with the i'th rule
         self.antecedents = []
         self.consequents = []
         self.P = None
@@ -123,36 +124,36 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
         all_antecedents = [rule['A'] for rule in self.rules]
         all_antecedents = np.array(all_antecedents)
         for p in range(self.P):
-            if len(self.antecedents[p]) == len(np.unique(all_antecedents[:,p])):
+            if len(self.antecedents[p]) == len(np.unique(all_antecedents[:, p])):
                 continue
             else:
                 # orphaned antecedent term
-                indices_for_antecedents_that_are_used = set(all_antecedents[:,p])
+                indices_for_antecedents_that_are_used = set(all_antecedents[:, p])
                 updated_indices_to_map_to = list(range(len(indices_for_antecedents_that_are_used)))
                 self.antecedents[p] = [self.antecedents[p][index] for index in indices_for_antecedents_that_are_used]
                 
                 paired_indices = list(zip(indices_for_antecedents_that_are_used, updated_indices_to_map_to))
-                for index_pair in paired_indices: # the paired indices are sorted w.r.t. the original indices
-                    original_index = index_pair[0] # so, when we updated the original index to its new index
-                    new_index = index_pair[1] # we are guaranteed not to overwrite the last updated index
-                    all_antecedents[:,p][all_antecedents[:,p] == original_index] = new_index
+                for index_pair in paired_indices:  # the paired indices are sorted w.r.t. the original indices
+                    original_index = index_pair[0]  # so, when we updated the original index to its new index
+                    new_index = index_pair[1]  # we are guaranteed not to overwrite the last updated index
+                    all_antecedents[:, p][all_antecedents[:, p] == original_index] = new_index
                 
         all_consequents = [rule['C'] for rule in self.rules]
         all_consequents = np.array(all_consequents)
         for q in range(self.Q):
-            if len(self.consequents[q]) == len(np.unique(all_consequents[:,q])):
+            if len(self.consequents[q]) == len(np.unique(all_consequents[:, q])):
                 continue
             else:
                 # orphaned consequent term
-                indices_for_consequents_that_are_used = set(all_consequents[:,q])
+                indices_for_consequents_that_are_used = set(all_consequents[:, q])
                 updated_indices_to_map_to = list(range(len(indices_for_consequents_that_are_used)))
                 self.consequents[q] = [self.consequents[q][index] for index in indices_for_consequents_that_are_used]
                 
                 paired_indices = list(zip(indices_for_consequents_that_are_used, updated_indices_to_map_to))
-                for index_pair in paired_indices: # the paired indices are sorted w.r.t. the original indices
-                    original_index = index_pair[0] # so, when we updated the original index to its new index
-                    new_index = index_pair[1] # we are guaranteed not to overwrite the last updated index
-                    all_consequents[:,q][all_consequents[:,q] == original_index] = new_index
+                for index_pair in paired_indices:  # the paired indices are sorted w.r.t. the original indices
+                    original_index = index_pair[0]  # so, when we updated the original index to its new index
+                    new_index = index_pair[1]  # we are guaranteed not to overwrite the last updated index
+                    all_consequents[:, q][all_consequents[:, q] == original_index] = new_index
                     
         # update the rules in case any orphaned terms occurred
         for idx, rule in enumerate(self.rules):
@@ -204,7 +205,7 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
         self.J = {}
         self.total_antecedents = 0
         for p in range(self.P):
-            fuzzy_clusters_in_I_p = set(self.antecedents_indices_for_each_rule[:,p])
+            fuzzy_clusters_in_I_p = set(self.antecedents_indices_for_each_rule[:, p])
             self.J[p] = len(fuzzy_clusters_in_I_p)
             self.total_antecedents += self.J[p]
         
@@ -228,7 +229,7 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
         self.L = {}
         self.total_consequents = 0
         for q in range(self.Q):
-            fuzzy_clusters_in_O_q = set(self.consequents_indices_for_each_rule[:,q])
+            fuzzy_clusters_in_O_q = set(self.consequents_indices_for_each_rule[:, q])
             self.L[q] = len(fuzzy_clusters_in_O_q)
             self.total_consequents += self.L[q]
         
@@ -239,7 +240,7 @@ class AdaptiveNeuroFuzzy(CoreNeuroFuzzy):
             for rule_index, consequent_indices_for_rule in enumerate(self.consequents_indices_for_each_rule):
                 start_idx = 0
                 for output_index, consequent_index in enumerate(consequent_indices_for_rule):
-                    self.W_3[rule_index, start_idx + consequent_index] = 1 # IndexError: index 29 is out of bounds for axis 1 with size 29
+                    self.W_3[rule_index, start_idx + consequent_index] = 1  # IndexError: index 29 is out of bounds for axis 1 with size 29
                     start_idx += self.L[output_index]
         except IndexError:
             return -1

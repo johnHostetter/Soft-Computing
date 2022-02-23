@@ -11,6 +11,7 @@ import numpy as np
 from scipy.special import softmax
 from sklearn.metrics import mean_squared_error
 
+
 def RMSE(predicted_Y, target_Y):
     """
     Calculates the Root-Mean-Square Error between the predicted output and the target output values.
@@ -29,6 +30,7 @@ def RMSE(predicted_Y, target_Y):
 
     """
     return np.sqrt(mean_squared_error(predicted_Y, target_Y))
+
 
 def KL(predicted_Y, target_Y, tau=0.1):
     """
