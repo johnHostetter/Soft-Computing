@@ -70,7 +70,7 @@ class CoreNeuroFuzzy(object):
         flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
 
         denominator = np.power(flat_widths, 2)
-        denominator = np.where(denominator == 0.0, np.finfo(np.float).eps, denominator)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        denominator = np.where(denominator == 0.0, np.finfo(np.float64).eps, denominator)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
         self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / denominator))
             
         return self.f2  # shape is (num of inputs, num of all antecedents)

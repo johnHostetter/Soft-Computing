@@ -63,8 +63,8 @@ class SaFIN(ModifyRulesNeuroFuzzy):
 
         """
         super().__init__()
-        self.alpha = alpha # the alpha threshold for the CLIP algorithm
-        self.beta = beta # the beta threshold for the CLIP algorithm
+        self.alpha = alpha  # the alpha threshold for the CLIP algorithm
+        self.beta = beta  # the beta threshold for the CLIP algorithm
         if X_mins is not None and X_maxes is not None:
             self.X_mins = X_mins
             self.X_maxes = X_maxes
@@ -90,19 +90,19 @@ class SaFIN(ModifyRulesNeuroFuzzy):
     def backpropagation(self, x, y):
         # (1) calculating the error signal in the output layer
 
-        e5_m = y - self.o5 # y actual minus y predicted
-        e5 = np.dot(e5_m, self.W_4.T) # assign the error to its corresponding output node
+        e5_m = y - self.o5  # y actual minus y predicted
+        e5 = np.dot(e5_m, self.W_4.T)  # assign the error to its corresponding output node
         error = (self.o4 * e5)
 
         # delta centers
         flat_centers = self.term_dict['consequent_centers'].flatten()
-        flat_centers = flat_centers[~np.isnan(flat_centers)] # get rid of the stored np.nan values
+        flat_centers = flat_centers[~np.isnan(flat_centers)]  # get rid of the stored np.nan values
         flat_widths = self.term_dict['consequent_widths'].flatten()
-        flat_widths = flat_widths[~np.isnan(flat_widths)] # get rid of the stored np.nan values
+        flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
         # y4_k = (centers * self.W_4.T)
         # numerator = (widths * y4_k)
-        widths = np.multiply(flat_widths[:,np.newaxis], self.W_4).T
-        num = np.multiply(widths[np.newaxis,:,:], self.o4[:, np.newaxis,:])
+        widths = np.multiply(flat_widths[:, np.newaxis], self.W_4).T
+        num = np.multiply(widths[np.newaxis, :, :], self.o4[:, np.newaxis,:])
         den = num.sum(axis=2)
         consequent_delta_c = (num / den[:, :, np.newaxis]).sum(axis=1)
 
@@ -114,25 +114,25 @@ class SaFIN(ModifyRulesNeuroFuzzy):
         difference = lhs_term - compatible_rhs_term
         numerator = np.multiply(self.o4, difference)
         denominator = np.power(den, 2)
-        compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
+        compatible_numerator = np.multiply(numerator[:, np.newaxis], self.W_4.T)
         division = (compatible_numerator / denominator[:, :, np.newaxis])
         consequent_delta_widths = division.sum(axis=1)
 
         # layer 4 error signal
         numerator = (flat_widths * difference)
-        compatible_numerator = np.multiply(numerator[:,np.newaxis], self.W_4.T)
+        compatible_numerator = np.multiply(numerator[:, np.newaxis], self.W_4.T)
         division = (compatible_numerator / denominator[:, :, np.newaxis])
         layer_4_error_rhs = division.sum(axis=1)
         layer_4_error = error * layer_4_error_rhs
 
         # layer 3 error signal
-        layer_3_error = (layer_4_error[:,np.newaxis,:] * self.W_3)
+        layer_3_error = (layer_4_error[:, np.newaxis, :] * self.W_3)
         layer_3_error = np.nansum(layer_3_error, axis=2)
 
         # layer 2 error signal
-        antecedent_activations = (self.o2[:,np.newaxis,:] * self.W_2.T) # shape is (num of observations, num of rules, num of antecedents)
-        y2_i = (self.o2[:,np.newaxis,:] * antecedent_activations)
-        r = np.nanargmin(y2_i, axis=2) # shape is (num of observations, num of rules)
+        antecedent_activations = (self.o2[:, np.newaxis, :] * self.W_2.T)  # shape is (num of observations, num of rules, num of antecedents)
+        y2_i = (self.o2[:, np.newaxis, :] * antecedent_activations)
+        r = np.nanargmin(y2_i, axis=2)  # shape is (num of observations, num of rules)
         dE_dy_i = np.zeros(self.o2.shape)
 
         for observation_idx in range(r.shape[0]):
@@ -146,25 +146,25 @@ class SaFIN(ModifyRulesNeuroFuzzy):
         # remove the stored np.nan values
         shape = antecedent_delta_c_lhs.shape
         antecedent_delta_c_lhs = antecedent_delta_c_lhs[~np.isnan(antecedent_delta_c_lhs)]
-        antecedent_delta_c_lhs = antecedent_delta_c_lhs.reshape(shape[0], int(antecedent_delta_c_lhs.shape[0] / shape[0])) # shape is (num of observations, num of all antecedents [nonapplicable antecedents removed])
-        antecedent_delta_c_rhs_num = 2 * (x[:,:,np.newaxis] - self.term_dict['antecedent_centers'])
+        antecedent_delta_c_lhs = antecedent_delta_c_lhs.reshape(shape[0], int(antecedent_delta_c_lhs.shape[0] / shape[0]))  # shape is (num of observations, num of all antecedents [nonapplicable antecedents removed])
+        antecedent_delta_c_rhs_num = 2 * (x[:, :, np.newaxis] - self.term_dict['antecedent_centers'])
         antecedent_delta_c_rhs_den = np.power(self.term_dict['antecedent_widths'], 2)
-        antecedent_delta_c_rhs_den = np.where(antecedent_delta_c_rhs_den == 0.0, np.finfo(np.float).eps, antecedent_delta_c_rhs_den) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        antecedent_delta_c_rhs_den = np.where(antecedent_delta_c_rhs_den == 0.0, np.finfo(np.float64).eps, antecedent_delta_c_rhs_den)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
 
         antecedent_delta_c_rhs = (antecedent_delta_c_rhs_num / antecedent_delta_c_rhs_den)
         shape = antecedent_delta_c_rhs.shape
-        compatible_antecedent_delta_c_rhs = antecedent_delta_c_rhs.reshape(shape[0], shape[1]*shape[2]) # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
+        compatible_antecedent_delta_c_rhs = antecedent_delta_c_rhs.reshape(shape[0], shape[1]*shape[2])  # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
         # remove the stored np.nan values
         compatible_antecedent_delta_c_rhs = compatible_antecedent_delta_c_rhs[~np.isnan(compatible_antecedent_delta_c_rhs)].reshape(antecedent_delta_c_lhs.shape)
         antecedent_delta_c = antecedent_delta_c_lhs * compatible_antecedent_delta_c_rhs
 
         # delta widths
-        antecedent_delta_widths_rhs_num = 2 * np.power((x[:,:,np.newaxis] - self.term_dict['antecedent_centers']), 2)
+        antecedent_delta_widths_rhs_num = 2 * np.power((x[:, :, np.newaxis] - self.term_dict['antecedent_centers']), 2)
         antecedent_delta_widths_rhs_den = np.power(self.term_dict['antecedent_widths'], 3)
-        antecedent_delta_widths_rhs_den = np.where(antecedent_delta_widths_rhs_den == 0.0, np.finfo(np.float).eps, antecedent_delta_widths_rhs_den) # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
+        antecedent_delta_widths_rhs_den = np.where(antecedent_delta_widths_rhs_den == 0.0, np.finfo(np.float64).eps, antecedent_delta_widths_rhs_den)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
         antecedent_delta_widths_rhs = (antecedent_delta_widths_rhs_num / antecedent_delta_widths_rhs_den)
         shape = antecedent_delta_widths_rhs.shape
-        compatible_antecedent_delta_widths_rhs = antecedent_delta_widths_rhs.reshape(shape[0], shape[1]*shape[2]) # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
+        compatible_antecedent_delta_widths_rhs = antecedent_delta_widths_rhs.reshape(shape[0], shape[1]*shape[2])  # shape[0] is num of observations, shape[1] is num of input nodes, shape[2] is maximum number of linguistic terms possible
         # remove the stored np.nan values
         compatible_antecedent_delta_widths_rhs = compatible_antecedent_delta_widths_rhs[~np.isnan(compatible_antecedent_delta_widths_rhs)].reshape(antecedent_delta_c_lhs.shape)
 
@@ -192,7 +192,8 @@ class SaFIN(ModifyRulesNeuroFuzzy):
                 shuffled_X, shuffled_Y = X, Y
 
             for i in range(NUM_OF_BATCHES):
-                print('--- Epoch %d; Batch %d ---' % (epoch + 1, i + 1))
+                if verbose:
+                    print('--- Epoch %d; Batch %d ---' % (epoch + 1, i + 1))
                 batch_X = X[batch_size*i:batch_size*(i+1)]
                 batch_Y = Y[batch_size*i:batch_size*(i+1)]
                 if self.X_mins is not None and self.X_maxes is not None:
@@ -262,11 +263,12 @@ class SaFIN(ModifyRulesNeuroFuzzy):
                 start = time.time()
                 rmse_before_prune = self.evaluate(batch_X, batch_Y)
                 end = time.time()
-                print('--- Batch RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
+                if verbose:
+                    print('--- Batch RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
+                    print()
                 if rule_pruning:
                     self.rule_pruning(batch_X, batch_Y, batch_size, verbose)
-                    rmse_after_prune = self.evaluate(batch_X, batch_Y) # we need to update the stored values e.g. self.o4
-                print()
+                    rmse_after_prune = self.evaluate(batch_X, batch_Y)  # we need to update the stored values e.g. self.o4
 
                 l_rate = 0.05
                 # l_rate = 0.001
@@ -334,13 +336,15 @@ class SaFIN(ModifyRulesNeuroFuzzy):
             start = time.time()
             rmse_before_prune = self.evaluate(shuffled_X, shuffled_Y)
             end = time.time()
-            print('--- Epoch RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
-            print()
+            if verbose:
+                print('--- Epoch RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
+                print()
 
         start = time.time()
         rmse_before_prune = self.evaluate(shuffled_X, shuffled_Y)
         end = time.time()
-        print('--- Training RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
-        print()
+        if verbose:
+            print('--- Training RMSE = %.6f with %d Number of Fuzzy Logic Rules in %.2f seconds ---' % (rmse_before_prune, self.K, end - start))
+            print()
 
         return rmse_before_prune
