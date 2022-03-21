@@ -61,7 +61,7 @@ for generation in range(num_generations):
 
     # Selecting the best parents in the population for mating.
     parents = ga.select_mating_pool(new_population, fitness,
-                                      num_parents_mating)
+                                    num_parents_mating)
     print("Parents")
     print(parents)
 

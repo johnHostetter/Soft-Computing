@@ -6,10 +6,8 @@ Created on Sun Oct 24 12:35:23 2021
 @author: john
 """
 
-import numpy as np
+from fuzzy.common.membership_functions import gaussian
 
-def gaussian(x, center, sigma):
-    return np.exp(-1.0 * (np.power(x - center, 2) / np.power(sigma, 2)))
 
 class InputStateVariable(object):
     fuzzy_set_list = []
@@ -19,7 +17,8 @@ class InputStateVariable(object):
 
     def get_fuzzy_sets(self):
         return self.fuzzy_set_list
-    
+
+
 class Gaussian(object):
     def __init__(self, center, sigma):
         self.center = center
@@ -27,6 +26,7 @@ class Gaussian(object):
     
     def membership_value(self, input_value):
         return gaussian(input_value, self.center, self.sigma)
+
 
 class Trapeziums(object):
     def __init__(self, left, left_top, right_top, right):
@@ -47,6 +47,7 @@ class Trapeziums(object):
         else:
             membership_value = 0.0
         return membership_value
+
 
 class Build(object):
     list_of_input_variable = []

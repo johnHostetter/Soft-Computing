@@ -16,7 +16,6 @@ Created on Sat Oct 23 22:56:26 2021
 """
 
 import os
-import sys
 import time
 import copy
 import torch
@@ -26,7 +25,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from fuzzy.denfis.ecm import ECM
-from fuzzy.reinforcement.cql import CQLModel
+from rl.cql import CQLModel
 from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
 from fuzzy.self_adaptive.clip import CLIP, rule_creation
 

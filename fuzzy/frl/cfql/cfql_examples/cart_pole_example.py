@@ -13,7 +13,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fuzzy.reinforcement.cfql import CFQLModel
+from fuzzy.frl.cfql.cfql import CFQLModel
 
 SEED = 10
 os.environ['PYTHONHASHSEED']=str(SEED)

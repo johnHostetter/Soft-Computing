@@ -17,7 +17,7 @@ import itertools
 import functools
 import numpy as np
 
-from fuzzy.reinforcement.fis import Build
+from fuzzy.frl.fql.fis import Build
 
 GLOBAL_SEED = 0
 np.random.seed(GLOBAL_SEED)

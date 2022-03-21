@@ -12,7 +12,7 @@ import torch
 import random
 import numpy as np
 
-from fuzzy.reinforcement.cfql import CFQLModel
+from fuzzy.frl.cfql.cfql import CFQLModel
 
 SEED = 0
 os.environ['PYTHONHASHSEED']=str(SEED)

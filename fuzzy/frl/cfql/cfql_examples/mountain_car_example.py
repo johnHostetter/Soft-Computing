@@ -10,9 +10,9 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fuzzy.reinforcement.fql import FQLModel
-from fuzzy.reinforcement.cfql import CFQLModel
-from fuzzy.reinforcement.fis import InputStateVariable, Trapeziums, Build
+from fuzzy.frl.fql.fql import FQLModel
+from fuzzy.frl.cfql.cfql import CFQLModel
+from fuzzy.frl.fql.fis import InputStateVariable, Trapeziums, Build
 
 GLOBAL_SEED = 1
 LOCAL_SEED = 42

@@ -8,7 +8,7 @@ Created on Fri Oct 22 23:19:15 2021
 
 import numpy as np
 
-from fuzzy.common.metrics import RMSE
+from fuzzy.common.metrics import root_mean_square_error
 
 
 class CoreNeuroFuzzy(object):
@@ -120,7 +120,7 @@ class CoreNeuroFuzzy(object):
         self.f4 = np.nanmax(consequent_activations, axis=2)
         return self.f4
     
-    def output_layer(self, o4):
+    def output_layer(self, o4, ENABLE_WIDTHS=True):
         """
         Defuzzification (using Center of Averaging Defuzzifier).
 
@@ -143,9 +143,14 @@ class CoreNeuroFuzzy(object):
         flat_centers = flat_centers[~np.isnan(flat_centers)]  # get rid of the stored np.nan values
         flat_widths = self.term_dict['consequent_widths'].flatten()
         flat_widths = flat_widths[~np.isnan(flat_widths)]  # get rid of the stored np.nan values
-        
-        numerator = np.nansum((temp_transformation * flat_centers * flat_widths), axis=2)
-        denominator = np.nansum((temp_transformation * flat_widths), axis=2)
+
+        if ENABLE_WIDTHS:
+            numerator = np.nansum((temp_transformation * flat_centers * flat_widths), axis=2)
+            denominator = np.nansum((temp_transformation * flat_widths), axis=2)
+        else:
+            numerator = np.nansum((temp_transformation * flat_centers), axis=2)
+            denominator = np.nansum(temp_transformation, axis=2)
+
         self.f5 = numerator / denominator
         if np.isnan(self.f5).any():
             raise Exception()
@@ -221,7 +226,7 @@ class CoreNeuroFuzzy(object):
 
         """
         est_Y = self.predict(X)
-        return RMSE(est_Y, Y)
+        return root_mean_square_error(est_Y, Y)
     
     def backpropagation(self, x, y):
         raise NotImplementedError('The backpropagation algorithm is still under development.')

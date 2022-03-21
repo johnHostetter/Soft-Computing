@@ -14,13 +14,16 @@ from scipy.spatial.distance import minkowski
 
 SUPPRESS_EXCEPTIONS = True
 
+
 class Cluster:
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius
         self.support = 1
+        
     def add_support(self):
         self.support += 1
+        
         
 def general_euclidean_distance(x, y):
     if len(x) == len(y): 
@@ -28,6 +31,7 @@ def general_euclidean_distance(x, y):
         return minkowski(x, y, p=2) / np.power(q, 0.5)
     else:
         raise TypeError('The vectors must of of equal dimensionality in order to use the General Euclidean Distance metric.')
+
 
 def ECM(X, Cs, Dthr, SUPPRESS_EXCEPTIONS=True):
     for i, x in enumerate(X):
@@ -155,6 +159,7 @@ def ECM(X, Cs, Dthr, SUPPRESS_EXCEPTIONS=True):
             if not SUPPRESS_EXCEPTIONS and general_euclidean_distance(Ca.center, x) != Ca.radius:
                 raise Exception('The distance from the center of the relevant cluster is meant to be equal to the cluster\'s radius.')
     return Cs
+
 
 def ECMc(X, Cs, Dthr):
     raise NotImplementedError('The offline ECMc function has not been implemented yet. It requires Mathwork\'s Constrained Minimization Method.')     

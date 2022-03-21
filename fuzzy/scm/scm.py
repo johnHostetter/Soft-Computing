@@ -49,5 +49,4 @@ def SCM(X, Y, r_a=0.1):
         clusters.append(second_cluster_center)
         last_cluster_center = second_cluster_center
 
-        
     return clusters, P

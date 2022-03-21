@@ -6,6 +6,7 @@ Created on Sun Oct 17 15:17:28 2021
 @author: john
 """
 
+
 class Rule:
     def __init__(self, dictionary):
         self.dictionary = dictionary # contains the antecedents and consequents (e.g. {'A':[...], 'C':[...]})

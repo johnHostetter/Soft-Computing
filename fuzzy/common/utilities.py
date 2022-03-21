@@ -10,7 +10,8 @@ import os
 import sys
 import numpy as np
 
-def boolean_indexing(v, fillval=np.nan):
+
+def boolean_indexing(v, fill_value=np.nan):
     """
     Converts uneven list of lists to Numpy array with np.nan as padding for smaller lists.
     
@@ -20,20 +21,22 @@ def boolean_indexing(v, fillval=np.nan):
     ----------
     v : list
         A list containing lists that have an uneven number of elements in each list.
-    fillval : float, optional
+    fill_value : float, optional
         The value to pad each list with if it is 'missing' elements. The default is np.nan.
 
     Returns
     -------
     out : 2-D Numpy array
-        A 2-D Numpy array representation of the list of lists, but with 'fillval' as the padding at the end of each row.
+        A 2-D Numpy array representation of the list of lists,
+        but with 'fill_value' as the padding at the end of each row.
 
     """
     lens = np.array([len(item) for item in v])
-    mask = lens[:,None] > np.arange(lens.max())
-    out = np.full(mask.shape, fillval)
+    mask = lens[:, None] > np.arange(lens.max())
+    out = np.full(mask.shape, fill_value)
     out[mask] = np.concatenate(v)
     return out
+
 
 class DirectoriesContextManager(object):
     # https://stackoverflow.com/questions/17211078/how-to-temporarily-modify-sys-path-in-python 

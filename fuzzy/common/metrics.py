@@ -12,15 +12,15 @@ from scipy.special import softmax
 from sklearn.metrics import mean_squared_error
 
 
-def RMSE(predicted_Y, target_Y):
+def root_mean_square_error(predicted, target):
     """
     Calculates the Root-Mean-Square Error between the predicted output and the target output values.
 
     Parameters
     ----------
-    predicted_Y : 2-D Numpy array
+    predicted : 2-D Numpy array
         The predicted values from a model.
-    target_Y : 2-D Numpy array
+    target : 2-D Numpy array
         The target values for a model.
 
     Returns
@@ -29,18 +29,18 @@ def RMSE(predicted_Y, target_Y):
         Root-Mean-Square Error.
 
     """
-    return np.sqrt(mean_squared_error(predicted_Y, target_Y))
+    return np.sqrt(mean_squared_error(predicted, target))
 
 
-def KL(predicted_Y, target_Y, tau=0.1):
+def kullback_leibler(predicted, target, tau=0.1):
     """
     Calculates the Kullback-Leibler Divergence between the predicted output and the target output values.
 
     Parameters
     ----------
-    predicted_Y : 2-D Numpy array
+    predicted : 2-D Numpy array
         The predicted values from a model.
-    target_Y : 2-D Numpy array
+    target : 2-D Numpy array
         The target values from a model.
     tau : float, optional
         The temperature of the softmax. The default is 0.1.
@@ -51,4 +51,5 @@ def KL(predicted_Y, target_Y, tau=0.1):
         Kullback-Leibler Divergence.
 
     """
-    return (softmax(target_Y / tau, axis=1) * (np.log(softmax(target_Y / tau, axis=1) / softmax(predicted_Y, axis=1)))).sum()
+    return (softmax(target / tau, axis=1) * (
+        np.log(softmax(target / tau, axis=1) / softmax(predicted, axis=1)))).sum()

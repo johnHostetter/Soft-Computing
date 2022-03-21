@@ -243,7 +243,7 @@ n_hidden = 50
 # Learning rate
 lr = 0.001
 
-from fdqn import FuzzyDQN, FuzzyDQN_replay
+from fdqn import FuzzyDQN_replay
 
 # fuzzy_dqn = FuzzyDQN()
 # episodes, memory, _ =  q_learning(env, fuzzy_dqn, 160, gamma=.95,
@@ -263,7 +263,7 @@ _, _, _ = play_cart_pole(env, fdqn_replay, 30, title='Self-Adaptive Mamdani Neur
 quit
 
 # Get DQN results
-from dqn import DQN, DQN_replay, DQN_double, fuzzy_DQN_double, DQN_replay_w_distill, DQN_double_distill
+from rl.dqn import DQN_double
 
 # simple_dqn = DQN(n_state, n_action, n_hidden, lr)
 # simple = q_learning(env, simple_dqn, episodes, gamma=.9, epsilon=0.3)
