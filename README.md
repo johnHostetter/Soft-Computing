@@ -2,6 +2,8 @@
 
 The project structure follows the answer provided by np8 to [this](https://stackoverflow.com/questions/714063/importing-modules-from-parent-folder) Stack Overflow question.
 
+### Setup procedure
+
 Steps on how the project was structured to handle the imports:
 
 1. Add a setup.py to the root folder (i.e. "soft_computing")
@@ -46,3 +48,11 @@ Steps on how the project was structured to handle the imports:
     9. Navigate to the root directory of this project (i.e., "soft_computing"). Click on the "venv" folder; note: this is the folder that was generated when we created the virtual environment, so if it was named differently, act accordingly. However, if you have followed these directions exactly, it should be named "venv".
     10. Inside "soft_computing/venv", click on the "bin" folder. Scroll to the "python3" file, and select it. Now, click "Open". This window will now close.
     11. In the bottom right of the "Preferences" window, click "Apply" and finally click "OK". This window will now close.
+
+### Troubleshooting
+1. If using PyCharm, and having trouble showing Matplotlib plots (e.g., "UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure"), please do the following:
+    1. [Install any of the Matplotlib GUI backends](https://exerror.com/userwarning-matplotlib-is-currently-using-agg-which-is-a-non-gui-backend-so-cannot-show-the-figure/).
+    2. [Go in the "Terminal" window (near bottom of screen, towards the left), and type](https://discuss.pixls.us/t/solved-could-not-load-the-qt-platform-plugin-xcb-in-even-though-it-was-found/17677/2):<br>
+    <code>sudo apt install libxkbcommon-x11-0</code><br>
+    3. [Also, type](https://discuss.pixls.us/t/solved-could-not-load-the-qt-platform-plugin-xcb-in-even-though-it-was-found/17677/2):<br>
+    <code>sudo apt install libxcb-xinerama0</code><br>
