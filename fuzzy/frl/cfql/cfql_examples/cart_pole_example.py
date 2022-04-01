@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from fuzzy.frl.cfql.cfql import CFQLModel
 
 SEED = 10
-os.environ['PYTHONHASHSEED']=str(SEED)
+os.environ['PYTHONHASHSEED'] = str(SEED)
 torch.manual_seed(SEED)
 random.seed(SEED)
 np.random.seed(SEED)

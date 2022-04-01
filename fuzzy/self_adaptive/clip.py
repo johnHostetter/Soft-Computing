@@ -11,9 +11,11 @@ import numpy as np
 
 from fuzzy.common.membership_functions import gaussian
 
+
 def R(sigma_1, sigma_2):
     # regulator function
     return (1/2) * (sigma_1 + sigma_2)
+
 
 def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
     # theta is a parameter I add to accomodate for the instance in which an observation has values that are the minimum/maximum
@@ -110,6 +112,7 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
                         new_sigma = R(sigma_R, sigma_L)
                     antecedents[p].append({'center':new_c, 'sigma':new_sigma, 'support':1})
     return antecedents
+
 
 def rule_creation(X, Y, antecedents, consequents, existing_rules=[], 
                   existing_weights=[], problem_type='SL', consistency_check=True):

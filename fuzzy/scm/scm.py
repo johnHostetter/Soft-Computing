@@ -11,6 +11,7 @@ import numpy as np
 from copy import deepcopy
 from sklearn.metrics.pairwise import euclidean_distances
 
+
 def potential(X, r_a):
     P = np.zeros(X.shape[0]) # the potential of each data point
     for i, x_i in enumerate(X):
@@ -18,6 +19,7 @@ def potential(X, r_a):
         alpha = 4 / np.power(r_a, 2)
         P[i] = (np.power(np.e, -1 * alpha * dist)).sum()
     return P
+
 
 def SCM(X, Y, r_a=0.1):
     clusters = []

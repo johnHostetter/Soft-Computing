@@ -18,6 +18,24 @@ GLOBAL_SEED = 1
 LOCAL_SEED = 42
 np.random.seed(GLOBAL_SEED)
 
+
+class Agent:
+    def __init__(self, model):
+        self.model = model
+
+    def get_initial_action(self, state):
+        try:
+            return self.model.get_initial_action(state)
+        except AttributeError:
+            return self.model.get_action(state)
+
+    def get_action(self, state):
+        return self.model.get_action(state)
+
+    def learn(self, state, reward):
+        return self.model.run(state, reward)
+
+
 # Define membership functions for MountainCar problems
 def get_fis_env():
     p = InputStateVariable(Trapeziums(-1.2, -1.2, -1.2, -0.775),
@@ -35,6 +53,7 @@ def get_fis_env():
     fis = Build(p, v)
     env.seed(LOCAL_SEED)
     return env, fis
+
 
 def play_mountain_car(model, max_eps=100, render=False):
     env, _ = get_fis_env()
@@ -100,6 +119,7 @@ def play_mountain_car(model, max_eps=100, render=False):
 
     return model, np.array(visited_states), trajectories, rewards
 
+
 def random_play_mountain_car(model=None, max_eps=500):
     env, _ = get_fis_env()
     print('Observation shape:', env.observation_space.shape)
@@ -134,6 +154,7 @@ def random_play_mountain_car(model=None, max_eps=500):
             done = True
     print('Epsilon=', 1.0)
     return model, trajectories, rewards
+
 
 def train_env(model=None, max_eps=500):
     env, fis = get_fis_env()
@@ -192,6 +213,10 @@ def train_env(model=None, max_eps=500):
     plt.show()
     return model, trajectories, rewards
 
+from rl.testbeds.mountain_car import MountainCar
+
+mountain_car = MountainCar(0, 10, None, verbose=True)
+mountain_car.play(False)
 # 10 episodes also works, but some interactions will still require ~2000 time-steps
 model, trajectories, _ = train_env(max_eps=10)
 # _, trajectories, _ = random_play_mountain_car(max_eps=100)
@@ -200,13 +225,23 @@ env, fis = get_fis_env()
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-clip_params = {'alpha':0.1, 'beta':0.7}
-fis_params = {'inference_engine':'product'}
-# note this alpha for CQL is different than CLIP's alpha
+
+model = FQLModel(gamma=0.99,
+                 alpha=0.1,
+                 ee_rate=1.,
+                 action_set_length=action_set_length,
+                 fis=fis)
+
+mountain_car = MountainCar(0, 100, Agent(model), verbose=True)
+mountain_car.play(True)
+
+clip_params = {'alpha': 0.1, 'beta': 0.7}
+fis_params = {'inference_engine': 'product'}
+# note this alpha for CQL is different from CLIP's alpha
 cql_params = {
-    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50,
-    'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
-    }
+    'gamma': 0.99, 'alpha': 0.1, 'batch_size': 1028, 'batches': 50,
+    'learning_rate': 1e-2, 'iterations': 100, 'action_set_length': action_set_length
+}
 cfql = CFQLModel(clip_params, fis_params, cql_params)
 new_cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
@@ -215,6 +250,8 @@ for idx, trajectory in enumerate(trajectories):
 
 train_X = np.array(X)
 cfql.fit(train_X, trajectories, ecm=True, Dthr=0.01, verbose=True)
+mountain_car = MountainCar(0, 100, Agent(cfql), verbose=True)
+mountain_car.play(False)
 _, _, _, greedy_offline_rewards = play_mountain_car(cfql, 100, False)
 cfql.ee_rate = 0.15
 _, _, _, ee_offline_rewards = play_mountain_car(cfql, 100, False)
