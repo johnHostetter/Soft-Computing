@@ -23,6 +23,9 @@ class Set:
         other = self.valid_binary_operation_check(other, 'Equal')
         return self.elements == other.elements
 
+    def __sub__(self, other):
+        return self.difference(other)
+
     def empty(self):
         return len(self.elements) == 0
 
@@ -32,6 +35,10 @@ class Set:
     def union(self, other):
         other = self.valid_binary_operation_check(other, 'Union')
         return Set(self.elements.union(other.elements), self.universe)
+
+    def difference(self, other):
+        other = self.valid_binary_operation_check(other, 'Difference')
+        return Set(self.elements.difference(other.elements), self.universe)
 
     def intersection(self, other):
         other = self.valid_binary_operation_check(other, 'Intersection')
@@ -238,6 +245,16 @@ class EquivalenceRelationFamily(EquivalenceRelation):
     def num_of_relations(self):
         return len(self.equivalence_relations)
 
+    def elementary_categories(self):  # the family of elementary categories
+        return list(itertools.combinations(self.equivalence_relations, 1))
+
+    def basic_categories(self):  # the family of basic categories
+        basic_categories = []
+        for length in range(1, len(self.equivalence_relations)+1):
+            categories = list(itertools.combinations(self.equivalence_relations, length))
+            basic_categories.extend(categories)
+        return basic_categories
+
 
 class IND(EquivalenceRelationFamily):
     def __init__(self, P, R, universe):
@@ -271,7 +288,7 @@ class KnowledgeBase:
         if isinstance(other, KnowledgeBase):
             return IND(self.R.equivalence_relations, self.R.equivalence_relations, self.universe) == IND(other.R.equivalence_relations, other.R.equivalence_relations, other.universe)  # i.e., U / P = U / Q
 
-    def Q_elementary_categories(self):  # the family of basic categories in knowledge base K = (U, R)
+    def Q_elementary_categories(self):  # the family of elementary categories in knowledge base K = (U, R)
         return list(itertools.combinations(self.equivalence_relation_family.equivalence_relations, 1))
 
     def P_basic_categories(self, P):  # the family of basic categories in knowledge base K = (U, R)
@@ -285,69 +302,3 @@ class KnowledgeBase:
         else:
             raise ValueError('P-basic categories method call requires the argument P to be an instance of the '
                              'EquivalenceRelationFamily class.')
-
-
-# # test 1 -- meant to fail with "ValueError: The intersection of two different concepts must be empty."
-# universe = {'a', 'b', 'c', 'd', 'e'}
-# X_1 = Concept({'a', 'b'}, universe)
-# X_2 = Concept({'b', 'c'}, {'a', 'b', 'c', 'd', 'e'})
-# concepts = ConceptFamily([X_1, X_2], universe)
-
-equivalence_class = EquivalenceClassFamily({frozenset([1, 2]), frozenset([3, 4])}, Universe({1, 2, 3, 4}))
-result = equivalence_class.make_equivalence_relation()
-
-# test 2 -- meant to pass
-U = universe = Universe({'a', 'b', 'c'})
-X_1 = Concept({'a', 'b'}, universe)
-X_2 = Concept({'c'}, universe)
-X_3 = Concept({'c'}, universe)
-print(hash(X_2) == hash(X_3))
-# X_2 = Concept({'d', 'c'}, {'a', 'b', 'c', 'd', 'e'})
-# X_3 = Concept({'e'}, {'a', 'b', 'c', 'd', 'e'})
-concepts = ConceptFamily([X_1, X_2], universe)
-
-R = EquivalenceRelation(Set({('a', 'a'), ('b', 'b'), ('c', 'c'), ('b', 'c'), ('c', 'b')}), universe)
-print(R['a'])
-print(R['b'])
-print(R['c'])
-
-print(U / R)
-
-U = Universe(set(['x%s' % i for i in range(1, 9)]))
-equivalence_class_1 = EquivalenceClassFamily({frozenset({'x1', 'x3', 'x7'}), frozenset({'x2', 'x4'}),
-                                              frozenset({'x5', 'x6', 'x8'})}, U)
-equivalence_class_2 = EquivalenceClassFamily({frozenset({'x1', 'x5'}), frozenset({'x2', 'x6'}),
-                                              frozenset({'x3', 'x4', 'x7', 'x8'})}, U)
-equivalence_class_3 = EquivalenceClassFamily({frozenset({'x2', 'x7', 'x8'}),
-                                              frozenset({'x1', 'x3', 'x4', 'x5', 'x6'})}, U)
-
-print(U / equivalence_class_1.R)
-print(U / equivalence_class_2.R)
-print(U / equivalence_class_3.R)
-
-equivalence_relation_family_1 = EquivalenceRelationFamily(Set({equivalence_class_1.R, equivalence_class_2.R,
-                                                           equivalence_class_3.R}), U)
-
-print('1 %s' % equivalence_relation_family_1.self_intersection())
-
-equivalence_relation_family_2 = EquivalenceRelationFamily(Set({equivalence_class_2.R, equivalence_class_3.R}), U)
-
-print('2 %s' % equivalence_relation_family_2['x1'])
-
-R = Set({equivalence_class_1.R, equivalence_class_2.R, equivalence_class_3.R})
-P = Set({equivalence_class_2.R, equivalence_class_3.R})
-
-print('IND(R): %s' % IND(R, R, U))
-print('IND(P): %s' % IND(P, R, U))
-
-print('Family of all equivalence classes of the equivalence relation IND(P): %s' % (U / IND(P, R, U)))
-print('IND equivalence class for x3: %s' % IND(P, R, U)['x3'])
-
-knowledge_base = KnowledgeBase(U, equivalence_relation_family_1)
-
-print(knowledge_base.P_basic_categories(equivalence_relation_family_2))
-
-# print(IND(knowledge_base)) # doesn't work yet
-
-print(knowledge_base == knowledge_base)  # should be true
-print(knowledge_base == KnowledgeBase(U, equivalence_relation_family_2))  # should be false
