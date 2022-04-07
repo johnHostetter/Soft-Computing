@@ -1,5 +1,6 @@
 import itertools
 
+from copy import deepcopy
 
 class Set:
     # wrapper class for Python's set, allows more complex set operations later on
@@ -143,8 +144,20 @@ class ConceptFamily:
             concepts_str.append(str(concept))
         return str(concepts_str)
 
+    def full_union(self):
+        F = Concept(set(), self.universe)
+        for concept in self.concepts:
+            F.union(concept)
+        return F
+
     def cardinality(self):
         return len(self.elements)
+
+    def dispensible(self, concept):
+        concepts_copy = deepcopy(self.concepts)
+        concepts_copy.remove(concept)  # TODO: this currently removes the selected relation in-place
+        new_family = ConceptFamily(concepts_copy, self.U)
+        return self.full_union() == new_family.full_union()
 
 
 class EquivalenceRelation(Concept):
@@ -234,6 +247,28 @@ class EquivalenceRelationFamily(EquivalenceRelation):
             else:
                 temp = temp.intersection(R[x])
         return Concept(temp.elements, self.universe)
+
+    def dispensable(self, relation):  # returns True if the given relation is dispensable, False otherwise
+        IND_family = IND(self.equivalence_relations, self.equivalence_relations, self.U)
+        # self.equivalence_relations.universe = relation.universe  # TODO: this isn't technically true, but it is a quick fix for now
+        # IND_R = IND(self.equivalence_relations - Set(relation, relation.universe), self.equivalence_relations - Set(relation, relation.universe), self.U)
+
+        lhs = self.U / IND_family
+        relations_copy = deepcopy(self.equivalence_relations.elements)
+        relations_copy.remove(relation)  # TODO: this currently removes the selected relation in-place
+        new_family = EquivalenceRelationFamily(Set(relations_copy), self.U)
+        IND_R = IND(new_family.equivalence_relations, new_family.equivalence_relations, self.U)
+        rhs = self.U / IND_R
+        return lhs == rhs
+
+    def independent(self):  # returns True if no relation in the family is dispensable aka if no relation can be removed, False otherwise
+        for relation in self.equivalence_relations:
+            if self.dispensable(relation):
+                return False
+        return True
+
+    def RED(self):  # get all reducts of this family
+        pass  # NP-hard?
 
     def self_intersection(self):
         result = set()
