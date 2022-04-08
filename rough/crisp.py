@@ -55,6 +55,15 @@ class RestrictedSetFamily:  # TODO: identical to ConceptFamily, except lose the 
             F = F.union(concept.elements)
         return Set(F, self.universe)
 
+    def full_intersection(self):
+        F = None
+        for concept in self.concepts:
+            if F is None:
+                F = concept.elements
+            else:
+                F = F.intersection(concept.elements)
+        return Set(F, self.universe)
+
     def cardinality(self):
         return len(self.elements)
 

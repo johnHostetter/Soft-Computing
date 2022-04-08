@@ -2,9 +2,12 @@ import itertools
 
 from copy import deepcopy
 
+
 class Set:
     # wrapper class for Python's set, allows more complex set operations later on
-    def __init__(self, elements, universe=None):  # universe of discourse is optional
+    def __init__(self, elements=None, universe=None):  # universe of discourse is optional
+        if elements is None:
+            elements = set()
         self.X = self.elements = elements  # this must be Python set
         self.U = self.universe = universe  # note: this can sometimes be the Set class, but it should be the Python set
 
@@ -26,6 +29,9 @@ class Set:
 
     def __sub__(self, other):
         return self.difference(other)
+
+    def add(self, other):  # TODO: currently an unsafe operation, checks nothing about universe of discourse, etc.
+        return Set(self.elements.add(other), self.universe)
 
     def empty(self):
         return len(self.elements) == 0
@@ -261,7 +267,8 @@ class EquivalenceRelationFamily(EquivalenceRelation):
         rhs = self.U / IND_R
         return lhs == rhs
 
-    def independent(self):  # returns True if no relation in the family is dispensable aka if no relation can be removed, False otherwise
+    def independent(self):  # returns True if no relation in the family is dispensable
+        # aka if no relation can be removed, False otherwise
         for relation in self.equivalence_relations:
             if self.dispensable(relation):
                 return False
@@ -285,7 +292,7 @@ class EquivalenceRelationFamily(EquivalenceRelation):
 
     def basic_categories(self):  # the family of basic categories
         basic_categories = []
-        for length in range(1, len(self.equivalence_relations)+1):
+        for length in range(1, len(self.equivalence_relations) + 1):
             categories = list(itertools.combinations(self.equivalence_relations, length))
             basic_categories.extend(categories)
         return basic_categories
@@ -321,7 +328,8 @@ class KnowledgeBase:
 
     def __eq__(self, other):
         if isinstance(other, KnowledgeBase):
-            return IND(self.R.equivalence_relations, self.R.equivalence_relations, self.universe) == IND(other.R.equivalence_relations, other.R.equivalence_relations, other.universe)  # i.e., U / P = U / Q
+            return IND(self.R.equivalence_relations, self.R.equivalence_relations, self.universe) == IND(
+                other.R.equivalence_relations, other.R.equivalence_relations, other.universe)  # i.e., U / P = U / Q
 
     def Q_elementary_categories(self):  # the family of elementary categories in knowledge base K = (U, R)
         return list(itertools.combinations(self.equivalence_relation_family.equivalence_relations, 1))
@@ -330,8 +338,9 @@ class KnowledgeBase:
         # e.g., IND(K)
         if isinstance(P, EquivalenceRelationFamily):
             basic_categories = []
-            for length in range(1, len(P)+1):
-                categories = list(itertools.combinations(self.equivalence_relation_family.equivalence_relations, length))
+            for length in range(1, len(P) + 1):
+                categories = list(
+                    itertools.combinations(self.equivalence_relation_family.equivalence_relations, length))
                 basic_categories.extend(categories)
             return basic_categories
         else:
