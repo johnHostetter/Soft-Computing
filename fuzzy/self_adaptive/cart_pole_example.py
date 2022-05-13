@@ -46,11 +46,11 @@ def transform_data(dataset):
 # seed 10 worked very well (solved), 11, 12, 14 did not work at all (not solved)
 # seed 13 worked okay but then got suboptimal (~65.61)
 # below was originally here, so, if this doesn't work, add it back in
-SEED = 12
-os.environ['PYTHONHASHSEED'] = str(SEED)
-torch.manual_seed(SEED)
-random.seed(SEED)
-np.random.seed(SEED)
+# SEED = 12
+# os.environ['PYTHONHASHSEED'] = str(SEED)
+# torch.manual_seed(SEED)
+# random.seed(SEED)
+# np.random.seed(SEED)
 
 
 def play_cart_pole(env, model, num_episodes, gamma=0.9,
@@ -283,6 +283,10 @@ val_loss_df = None
 train_loss_df = None
 online_evaluation_df = None
 for SEED in range(5):
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+    torch.manual_seed(SEED)
+    random.seed(SEED)
+    np.random.seed(SEED)
     env = gym.make('CartPole-v1')
     env.seed(SEED)
     env.action_space.seed(SEED)
