@@ -7,3 +7,4 @@ pandas~=1.4.1
 matplotlib~=3.5.1
 gym~=0.23.1
 sympy~=1.10.1
+d3rlpy~=1.1.0
