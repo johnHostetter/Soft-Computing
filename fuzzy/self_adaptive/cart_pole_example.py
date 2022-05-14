@@ -9,6 +9,8 @@ Created on Sat Oct  9 21:56:59 2021
 # https://towardsdatascience.com/deep-q-learning-for-the-cartpole-44d761085c2f
 
 import os
+import sys
+
 import gym
 import time
 import torch
@@ -336,196 +338,198 @@ def offline_q_learning(model, training_dataset, validation_dataset, max_epochs=1
         epoch += 1
     return model, train_epoch_losses, val_epoch_losses
 
-SAVE = False
-val_loss_df = None
-train_loss_df = None
-online_evaluation_df = None
-for SEED in range(5):
-    os.environ['PYTHONHASHSEED'] = str(SEED)
-    torch.manual_seed(SEED)
-    random.seed(SEED)
-    np.random.seed(SEED)
-    env = gym.make('CartPole-v1')
-    env.seed(SEED)
-    env.action_space.seed(SEED)
+if __name__ == "__main__":
+    SAVE = False
+    val_loss_df = None
+    train_loss_df = None
+    online_evaluation_df = None
+    print('Start at seed {} and end before seed {}'.format(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])))
+    for SEED in range(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])):
+        print('Using seed {}'.format(SEED))
+        os.environ['PYTHONHASHSEED'] = str(SEED)
+        torch.manual_seed(SEED)
+        random.seed(SEED)
+        np.random.seed(SEED)
+        env = gym.make('CartPole-v1')
+        env.seed(SEED)
+        env.action_space.seed(SEED)
 
-    # Number of states
-    n_state = env.observation_space.shape[0]
-    # Number of actions
-    n_action = env.action_space.n
-    # Number of episodes
-    MAX_NUM_EPISODES = 100  # was 160
-    # Learning rate
-    lr = 0.001
-    # Number of epochs allowed
-    EPOCHS = 3
+        # Number of states
+        n_state = env.observation_space.shape[0]
+        # Number of actions
+        n_action = env.action_space.n
+        # Number of episodes
+        MAX_NUM_EPISODES = 100  # was 160
+        # Learning rate
+        lr = 0.001
+        # Number of epochs allowed
+        EPOCHS = 12
 
-    seed_df = None
-    dataset = dataset[:1000]
-    # for num_of_train_episodes in range(100, 1000 + 1, 100):
-    for num_of_train_episodes in range(10, 101, 10):
-    # for num_of_train_episodes in [100]:
-        print('num of training episodes available: {}'.format(num_of_train_episodes))
-        # split train and test episodes
-        train_episodes, val_episodes = train_test_split(dataset, test_size=0.2)
-        train_episodes = train_episodes[:num_of_train_episodes]
+        seed_df = None
+        dataset = dataset[:1000]
+        for num_of_train_episodes in range(10, 251, 10):
+            print('num of training episodes available: {}'.format(num_of_train_episodes))
+            # split train and test episodes
+            train_episodes, val_episodes = train_test_split(dataset, test_size=0.2)
+            train_episodes = train_episodes[:num_of_train_episodes]
 
-        # # start of CQL code
-        #
-        # # setup CQL algorithm
-        # cql = DiscreteCQL(use_gpu=False)
-        # cql._alpha = 0.1
-        #
-        # # start training
-        # cql.fit(train_episodes,
-        #         eval_episodes=val_episodes,
-        #         n_epochs=6,
-        #         scorers={
-        #             'environment': evaluate_on_environment(env),  # evaluate with CartPol-v0 environment
-        #             'advantage': discounted_sum_of_advantage_scorer,  # smaller is better
-        #             'td_error': td_error_scorer,  # smaller is better
-        #             'value_scale': average_value_estimation_scorer  # smaller is better
-        #         })
-        #
-        # # evaluate
-        # print(evaluate_on_environment(env)(cql))
-        #
-        # # end of CQL code
+            # # start of CQL code
+            #
+            # # setup CQL algorithm
+            # cql = DiscreteCQL(use_gpu=False)
+            # cql._alpha = 0.1
+            #
+            # # start training
+            # cql.fit(train_episodes,
+            #         eval_episodes=val_episodes,
+            #         n_epochs=6,
+            #         scorers={
+            #             'environment': evaluate_on_environment(env),  # evaluate with CartPol-v0 environment
+            #             'advantage': discounted_sum_of_advantage_scorer,  # smaller is better
+            #             'td_error': td_error_scorer,  # smaller is better
+            #             'value_scale': average_value_estimation_scorer  # smaller is better
+            #         })
+            #
+            # # evaluate
+            # print(evaluate_on_environment(env)(cql))
+            #
+            # # end of CQL code
 
-        trajectories, train_X = transform_data(train_episodes)
-        val_trajectories, _ = transform_data(val_episodes)
+            trajectories, train_X = transform_data(train_episodes)
+            val_trajectories, _ = transform_data(val_episodes)
 
-        from sklearn.preprocessing import Normalizer
+            from sklearn.preprocessing import Normalizer
 
-        transformer = Normalizer().fit(train_X)
+            transformer = Normalizer().fit(train_X)
 
-        # get replay results
-        from neuro_q_net import MIMO_replay
+            # get replay results
+            from neuro_q_net import MIMO_replay
 
-        rules_, weights_, antecedents_, consequents_ = unsupervised(train_X, None, ecm=True, Dthr=4e-1)
-        print('There are {} rules'.format(len(rules_)))
+            rules_, weights_, antecedents_, consequents_ = unsupervised(train_X, None, ecm=True, Dthr=4e-1)
+            print('There are {} rules'.format(len(rules_)))
 
-        for input_variable in antecedents_:
-            print(len(input_variable))
-        # mimo = MIMO_replay(antecedents_, rules_, 2, consequents_, 0., .1)
+            for input_variable in antecedents_:
+                print(len(input_variable))
+            # mimo = MIMO_replay(antecedents_, rules_, 2, consequents_, 0., .1)
 
-        # print('online training FQL')
-        # episodes, memory, online_train_scores = q_learning(env, mimo, MAX_NUM_EPISODES, gamma=.9, epsilon=1.0,
-        #                     replay=True, title='Mamdani Neuro-Fuzzy Q-Network')
-        # # online_train_fql_df = pd.DataFrame({'policy': ['online_train_FQL'] * len(online_train_scores),
-        # #                                     'episode': range(len(online_train_scores)),
-        # #                                     'total_reward': online_train_scores})
-        # # online_train_fql_df['rules'] = len(mimo.flcs[0].rules)
-        # # online_train_fql_df['unsupervised_size'] = FCQL_num_of_train_episodes
-        #
-        # print('online testing FQL')
-        # _, _, online_test_scores = play_cart_pole(env, mimo, 100)
-        # print(np.mean(online_test_scores))
-        # online_test_fql_df = pd.DataFrame({'policy': ['online_test_FQL'] * len(online_test_scores),
-        #                                     'episode': range(len(online_test_scores)),
-        #                                     'total_reward': online_test_scores})
-        # online_test_fql_df['rules'] = len(mimo.flcs[0].rules)
-        # online_test_fql_df['unsupervised_size'] = FCQL_num_of_train_episodes
+            # print('online training FQL')
+            # episodes, memory, online_train_scores = q_learning(env, mimo, MAX_NUM_EPISODES, gamma=.9, epsilon=1.0,
+            #                     replay=True, title='Mamdani Neuro-Fuzzy Q-Network')
+            # # online_train_fql_df = pd.DataFrame({'policy': ['online_train_FQL'] * len(online_train_scores),
+            # #                                     'episode': range(len(online_train_scores)),
+            # #                                     'total_reward': online_train_scores})
+            # # online_train_fql_df['rules'] = len(mimo.flcs[0].rules)
+            # # online_train_fql_df['unsupervised_size'] = FCQL_num_of_train_episodes
+            #
+            # print('online testing FQL')
+            # _, _, online_test_scores = play_cart_pole(env, mimo, 100)
+            # print(np.mean(online_test_scores))
+            # online_test_fql_df = pd.DataFrame({'policy': ['online_test_FQL'] * len(online_test_scores),
+            #                                     'episode': range(len(online_test_scores)),
+            #                                     'total_reward': online_test_scores})
+            # online_test_fql_df['rules'] = len(mimo.flcs[0].rules)
+            # online_test_fql_df['unsupervised_size'] = FCQL_num_of_train_episodes
 
-        from neuro_q_net import DoubleMIMO
+            from neuro_q_net import DoubleMIMO
 
-        print('offline FCQL')
-        # t = 0.1
-        # # percent_of_data = num_of_train_episodes / len(dataset)
-        # val = (num_of_train_episodes / 10) * np.log(2 + np.sqrt(3)*t)
-        # cql_alpha = 1 / (1 + np.exp(val))
-        cql_alpha = 0.5
-        print('CQL Alpha: {}'.format(cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
-        offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=0.5,
-                                   learning_rate=5e-2)
+            print('offline FCQL')
+            # t = 0.1
+            # # percent_of_data = num_of_train_episodes / len(dataset)
+            # val = (num_of_train_episodes / 10) * np.log(2 + np.sqrt(3)*t)
+            # cql_alpha = 1 / (1 + np.exp(val))
+            cql_alpha = 0.5
+            print('CQL Alpha: {}'.format(cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
+            offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=0.5,
+                                       learning_rate=1e-4)
 
-        batch_size = 128
-        offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
-                                                                                val_trajectories, EPOCHS, batch_size,
-                                                                                gamma=0.99)  # gamma was 0.5
+            batch_size = 64
+            offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
+                                                                                    val_trajectories, EPOCHS, batch_size,
+                                                                                    gamma=0.99)  # gamma was 0.5
 
-        from neuro_q_net import EvaluationWrapper
+            from neuro_q_net import EvaluationWrapper
 
-        avg_score, std_score = evaluate_on_environment(env)(EvaluationWrapper(offline_mimo))
-        # save the training losses
-        loss_df = pd.DataFrame({'policy': ['FCQL'] * len(train_epoch_losses),
-                                'epoch': range(len(train_epoch_losses)),
-                                'train_loss': train_epoch_losses, 'val_loss': val_epoch_losses})
-        loss_df['train_size'] = num_of_train_episodes
-        loss_df['rules'] = len(offline_mimo.flcs[0].rules)
-        for idx, input_variable in enumerate(antecedents_):
-            loss_df['input_variable_{}'.format(idx)] = len(input_variable)
-        loss_df['avg_score'] = avg_score
-        loss_df['std_score'] = std_score
-        loss_df['seed'] = SEED
-        print(loss_df.head())
-
-        if seed_df is None:
-            seed_df = loss_df
-        else:
-            seed_df = pd.concat([seed_df, loss_df])
-
-        if SAVE:
+            avg_score, std_score = evaluate_on_environment(env)(EvaluationWrapper(offline_mimo))
             # save the training losses
-            train_loss_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(train_epoch_losses),
-                                               'epoch': range(len(train_epoch_losses)),
-                                               'train_loss': train_epoch_losses})
-            train_loss_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
+            loss_df = pd.DataFrame({'policy': ['FCQL'] * len(train_epoch_losses),
+                                    'epoch': range(len(train_epoch_losses)),
+                                    'train_loss': train_epoch_losses, 'val_loss': val_epoch_losses})
+            loss_df['train_size'] = num_of_train_episodes
+            loss_df['transitions'] = len(trajectories)
+            loss_df['rules'] = len(offline_mimo.flcs[0].rules)
             for idx, input_variable in enumerate(antecedents_):
-                train_loss_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
-            train_loss_fcql_df['train_size'] = num_of_train_episodes
-            train_loss_fcql_df['seed'] = SEED
+                loss_df['input_variable_{}'.format(idx)] = len(input_variable)
+            loss_df['avg_score'] = avg_score
+            loss_df['std_score'] = std_score
+            loss_df['seed'] = SEED
+            print(loss_df.head())
 
-            # save the validation losses
-            val_loss_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(val_epoch_losses),
-                                             'epoch': range(len(val_epoch_losses)),
-                                             'val_loss': val_epoch_losses})
-            val_loss_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
-            for idx, input_variable in enumerate(antecedents_):
-                val_loss_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
-            val_loss_fcql_df['train_size'] = num_of_train_episodes
-            val_loss_fcql_df['seed'] = SEED
-
-            # save the online evaluation scores
-            _, _, offline_scores = play_cart_pole(env, offline_mimo, MAX_NUM_EPISODES)
-            offline_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(offline_scores),
-                                            'episode': range(len(offline_scores)),
-                                            'total_reward': offline_scores})
-            offline_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
-            for idx, input_variable in enumerate(antecedents_):
-                offline_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
-            offline_fcql_df['train_size'] = num_of_train_episodes
-            offline_fcql_df['seed'] = SEED
-
-            # print(np.mean(offline_scores))
-
-            # seed_df = pd.concat([online_train_fql_df, online_test_fql_df, offline_fcql_df])
-            # seed_df['seed'] = SEED
-
-            # record all val losses across seeds & num of train episodes avail.
-            if val_loss_df is None:
-                val_loss_df = val_loss_fcql_df
+            if seed_df is None:
+                seed_df = loss_df
             else:
-                val_loss_df = pd.concat([val_loss_df, val_loss_fcql_df])
+                seed_df = pd.concat([seed_df, loss_df])
 
-            # record all train losses across seeds & num of train episodes avail.
-            if train_loss_df is None:
-                train_loss_df = train_loss_fcql_df
-            else:
-                train_loss_df = pd.concat([train_loss_df, train_loss_fcql_df])
+            if SAVE:
+                # save the training losses
+                train_loss_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(train_epoch_losses),
+                                                   'epoch': range(len(train_epoch_losses)),
+                                                   'train_loss': train_epoch_losses})
+                train_loss_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
+                for idx, input_variable in enumerate(antecedents_):
+                    train_loss_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
+                train_loss_fcql_df['train_size'] = num_of_train_episodes
+                train_loss_fcql_df['seed'] = SEED
 
-            # record all online evaluation scores across seeds & num of train episodes avail.
-            if online_evaluation_df is None:
-                online_evaluation_df = offline_fcql_df
-            else:
-                online_evaluation_df = pd.concat([online_evaluation_df, offline_fcql_df])
+                # save the validation losses
+                val_loss_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(val_epoch_losses),
+                                                 'epoch': range(len(val_epoch_losses)),
+                                                 'val_loss': val_epoch_losses})
+                val_loss_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
+                for idx, input_variable in enumerate(antecedents_):
+                    val_loss_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
+                val_loss_fcql_df['train_size'] = num_of_train_episodes
+                val_loss_fcql_df['seed'] = SEED
 
-            # seed_df.to_csv('seed={}_episodes={}.csv'.format(SEED, num_of_train_episodes), index=False)
-            val_loss_df.to_csv('./results/val_losses_seed={}.csv'.format(SEED), index=False)
-            train_loss_df.to_csv('./results/train_losses_seed={}.csv'.format(SEED), index=False)
-            online_evaluation_df.to_csv('./results/online_evaluation_seed={}.csv'.format(SEED), index=False)
+                # save the online evaluation scores
+                _, _, offline_scores = play_cart_pole(env, offline_mimo, MAX_NUM_EPISODES)
+                offline_fcql_df = pd.DataFrame({'policy': ['offline_FCQL'] * len(offline_scores),
+                                                'episode': range(len(offline_scores)),
+                                                'total_reward': offline_scores})
+                offline_fcql_df['rules'] = len(offline_mimo.flcs[0].rules)
+                for idx, input_variable in enumerate(antecedents_):
+                    offline_fcql_df['input_variable_{}'.format(idx)] = len(input_variable)
+                offline_fcql_df['train_size'] = num_of_train_episodes
+                offline_fcql_df['seed'] = SEED
 
-    seed_df.to_csv('./results/flc_output_{}.csv'.format(SEED), encoding='utf-8-sig', index=False)
+                # print(np.mean(offline_scores))
+
+                # seed_df = pd.concat([online_train_fql_df, online_test_fql_df, offline_fcql_df])
+                # seed_df['seed'] = SEED
+
+                # record all val losses across seeds & num of train episodes avail.
+                if val_loss_df is None:
+                    val_loss_df = val_loss_fcql_df
+                else:
+                    val_loss_df = pd.concat([val_loss_df, val_loss_fcql_df])
+
+                # record all train losses across seeds & num of train episodes avail.
+                if train_loss_df is None:
+                    train_loss_df = train_loss_fcql_df
+                else:
+                    train_loss_df = pd.concat([train_loss_df, train_loss_fcql_df])
+
+                # record all online evaluation scores across seeds & num of train episodes avail.
+                if online_evaluation_df is None:
+                    online_evaluation_df = offline_fcql_df
+                else:
+                    online_evaluation_df = pd.concat([online_evaluation_df, offline_fcql_df])
+
+                # seed_df.to_csv('seed={}_episodes={}.csv'.format(SEED, num_of_train_episodes), index=False)
+                val_loss_df.to_csv('./results/val_losses_seed={}.csv'.format(SEED), index=False)
+                train_loss_df.to_csv('./results/train_losses_seed={}.csv'.format(SEED), index=False)
+                online_evaluation_df.to_csv('./results/online_evaluation_seed={}.csv'.format(SEED), index=False)
+
+        seed_df.to_csv('./results/flc_output_{}.csv'.format(SEED), encoding='utf-8-sig', index=False)
 
 # val_loss_df.to_csv('./results/val_losses.csv', index=False)
 # train_loss_df.to_csv('./results/train_losses.csv', index=False)
