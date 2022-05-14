@@ -142,12 +142,61 @@ class FLC(AdaptiveNeuroFuzzy):
         return self.legacy_a(x) / self.legacy_b(x)
 
 
+class AdamOptim():
+    # https://towardsdatascience.com/how-to-implement-an-adam-optimizer-from-scratch-76e7b217f1cc
+    def __init__(self, eta=0.01, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        self.m_dw, self.v_dw = 0, 0
+        self.m_db, self.v_db = 0, 0
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.eta = eta
+
+    def update(self, t, w, dw, b=None, db=None):
+        # dw, db are from current minibatch
+        # momentum beta 1
+        # *** weights *** #
+        self.m_dw = self.beta1 * self.m_dw + (1 - self.beta1) * dw
+        # *** biases *** #
+        if b is not None and db is not None:
+            self.m_db = self.beta1 * self.m_db + (1 - self.beta1) * db
+
+        # rms beta 2
+        # *** weights *** #
+        self.v_dw = self.beta2 * self.v_dw + (1 - self.beta2) * (dw ** 2)
+        # *** biases *** #
+        if b is not None and db is not None:
+            self.v_db = self.beta2 * self.v_db + (1 - self.beta2) * (db)
+
+        # bias correction
+        m_dw_corr = self.m_dw / (1 - self.beta1 ** t)
+        if b is not None and db is not None:
+            m_db_corr = self.m_db / (1 - self.beta1 ** t)
+        v_dw_corr = self.v_dw / (1 - self.beta2 ** t)
+        if b is not None and db is not None:
+            v_db_corr = self.v_db / (1 - self.beta2 ** t)
+
+        # update weights and biases
+        w = w - self.eta * (m_dw_corr / (np.sqrt(v_dw_corr) + self.epsilon))
+        if b is not None and db is not None:
+            b = b - self.eta * (m_db_corr / (np.sqrt(v_db_corr) + self.epsilon))
+        else:
+            b = np.nan
+        return w, b
+
+
 class MIMO:
     def __init__(self, normalizer, antecedents, rules, n_outputs, consequent_term, cql_alpha, learning_rate=1e-3):
+        self.timestep = 0
+        self.cql_alpha = cql_alpha
         self.normalizer = normalizer
+        self.learning_rate = learning_rate
+        self.adam = AdamOptim(eta=learning_rate)
         self.flcs = []
+
         for _ in range(n_outputs):
             consequents = np.zeros(len(rules))
+            # consequents = np.random.uniform(0, 1.0, len(rules))
             self.flcs.append(FLC(antecedents, rules, consequents, consequent_term, cql_alpha, learning_rate))
 
     def predict(self, x):
@@ -200,80 +249,7 @@ class MIMO:
         loss = loss + self.cql_alpha * torch.mean(cql_loss)
         return loss
 
-    def slow_offline_update(self, train_X, train_y, train_action_indices, val_X, val_y, val_action_indices):
-        self.cql_alpha = 0.07
-
-        # calculate the outputs
-
-        train_flc_outputs = self.predict(train_X).numpy()
-        old_train_flc_outputs = self.calc_flc_outputs(train_X)
-        if np.abs(train_flc_outputs - old_train_flc_outputs.T).max() > 2e-3:
-            print('bad flc outputs')
-        val_flc_outputs = self.predict(val_X).numpy()
-
-        # calculate the loss for reporting & monitoring
-
-        train_loss = self.calc_offline_loss(train_flc_outputs, train_y, train_action_indices)
-        val_loss = self.calc_offline_loss(val_flc_outputs, val_y, val_action_indices)
-
-        # gradient descent
-
-        for flc_idx, flc in enumerate(self.flcs):
-            if train_y.ndim == 1:  # single observation
-                y_ = train_y[flc_idx]
-            elif train_y.ndim == 2:  # multiple observations
-                y_ = train_y[:, flc_idx]
-
-            constant = 2 / len(y_)
-            summation = np.zeros((flc.M))
-            all_offline_losses = []
-            for training_idx, x in enumerate(train_X):
-                loss_on_data_point = float((flc.predict(x) - y_[training_idx])[0, 0])
-                rule_consequences_losses = []
-
-                # online + offline
-                offline_losses = []
-                for l in range(flc.M):
-                    z = flc.z(l)[0]
-                    # z = self.current_rule_activations[l]
-                    # consequent terms' centers
-                    b = flc.b()[0]
-                    rule_consequences_losses.append((z / b))
-
-                    # OFFLINE ONLY!!!
-                    numerator = (np.exp(train_flc_outputs[training_idx, flc_idx]) * z / b)
-                    denominator = (np.log(2) * np.exp(train_flc_outputs[training_idx, :])).sum()
-
-                    offline_losses.append(((numerator / denominator) - (z / b)))
-
-                rule_consequences_losses = loss_on_data_point * np.array(rule_consequences_losses)
-                summation += rule_consequences_losses
-                all_offline_losses.append(offline_losses)
-
-            all_offline_losses = np.array(all_offline_losses)
-            offline_adjustment = self.cql_alpha * all_offline_losses.mean(axis=0)
-            mse = constant * summation
-
-            # learning_rate = 0.06
-            learning_rate = 1e-3
-            return (offline_adjustment + mse)
-            flc.y -= learning_rate * (offline_adjustment + mse)
-
-        # check the last mse
-        wip_mse, wip_offlines = self.wip_offline_update(train_X, train_y, train_action_indices, val_X, val_y, val_action_indices, mse, all_offline_losses.mean(axis=0))
-        if np.abs(mse - wip_mse).max() > 2e-3:
-            print('bad mse {}'.format(np.abs(mse - wip_mse).max()))
-        if np.abs(all_offline_losses.mean(axis=0) - wip_offlines).max() > 2e-3:
-            print('bad offlines')
-        return train_loss, val_loss
-
     def offline_update(self, train_X, train_y, train_action_indices, val_X, val_y, val_action_indices):
-        ###################################################################################################
-        # this code is trying to make the above function ''offline_update()'' faster
-        ###################################################################################################
-
-        self.cql_alpha = 0.1
-
         # calculate the outputs
 
         train_flc_outputs = self.predict(train_X).numpy()
@@ -310,35 +286,13 @@ class MIMO:
                 offlines[l] = (((numerator / denominator) - (z / b)).mean())
 
             offline_adjustment = self.cql_alpha * offlines
-            learning_rate = 1e-2
             # learning_rate = 6.25e-05
-            # old_adjustment = self.slow_offline_update(train_X, train_y, train_action_indices, val_X, val_y, val_action_indices)
-            flc.y -= learning_rate * (offline_adjustment + mse)
-        # return mse, offlines
+            flc.y, _ = self.adam.update(self.timestep, w=flc.y, dw=(offline_adjustment + mse))
+            # flc.y -= learning_rate * (offline_adjustment + mse)
         return train_loss, val_loss
 
 
 class MIMO_replay(MIMO):
-    def slow_extract_data_from_trajectories(self, batch, gamma):
-        states = []
-        targets = []
-        action_indices = []
-        for state, action, next_state, reward, done in batch:
-            states.append(state.tolist())
-            action_indices.append(action)
-            # Predict q_values
-            q_values = self.predict(state[np.newaxis, :]).tolist()[0]
-            if done:
-                q_values[action] = reward
-            else:
-                q_values_next = self.predict(next_state[np.newaxis, :])
-                target = reward + gamma * torch.max(q_values_next).item()
-                q_values[action] = reward + gamma * torch.max(q_values_next).item()
-                # targets.append(target)
-
-            targets.append(q_values)
-        return np.array(states), np.array(targets), action_indices
-
     def extract_data_from_trajectories(self, batch, gamma):
         batch = np.array(batch)
         states = np.array([list(state) for state in batch[:, 0]])
@@ -354,16 +308,7 @@ class MIMO_replay(MIMO):
         q_values[torch.arange(len(q_values)), action_indices] += torch.tensor(
             [0.0 if done else float(max_q_values_next[idx]) for idx, done in enumerate(dones)])
         targets = q_values.numpy()
-        # for state, action, next_state, reward, done in batch:
-        #     # Predict q_values
-        #     # q_values = self.predict([state]).tolist()
-        #     if done:
-        #         q_values[action] = reward
-        #     else:
-        #         # q_values_next = self.predict([next_state])
-        #         q_values[action] = reward + gamma * torch.max(q_values_next).item()
-        #
-        #     targets.append(q_values)
+
         return states, targets, action_indices
 
     def replay(self, train_memory, size, validation_memory, gamma=0.9, online=True):
@@ -379,10 +324,13 @@ class MIMO_replay(MIMO):
             train_losses = []
             val_losses = []
             for batch in batches:
+                self.timestep += 1  # the number of gradient descent updates performed thus far
+
                 # Extract information from the data
                 train_states, train_targets, train_action_indices = self.extract_data_from_trajectories(batch, gamma)
 
-                val_states, val_targets, val_action_indices = self.extract_data_from_trajectories(validation_memory, gamma)
+                val_states, val_targets, val_action_indices = self.extract_data_from_trajectories(validation_memory,
+                                                                                                  gamma)
 
                 if online:  # needs updating (to remove validation data arguments)
                     train_loss, val_loss = self.offline_update(train_states, train_targets, train_action_indices,
@@ -390,10 +338,17 @@ class MIMO_replay(MIMO):
                 else:
                     train_loss, val_loss = self.offline_update(train_states, train_targets, train_action_indices,
                                                                val_states, val_targets, val_action_indices)
-
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
             return np.array(train_losses), np.array(val_losses)
+
+
+class EvaluationWrapper:
+    def __init__(self, agent):
+        self.agent = agent
+
+    def predict(self, state):
+        return [torch.argmax(self.agent.predict(state)).item()]
 
 
 class DoubleMIMO(MIMO):
