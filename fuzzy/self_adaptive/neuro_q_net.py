@@ -215,7 +215,7 @@ class MIMO:
             An array of the actions' Q-values, where the i'th Q-value corresponds to the i'th possible action.
 
         """
-        x = self.normalizer.transform(x)
+        # x = self.normalizer.transform(x)
         self.flcs[0].truth_value(x)  # x can be multiple observations
         q_table = []
         for flc in self.flcs:
