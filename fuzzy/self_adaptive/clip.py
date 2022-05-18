@@ -91,6 +91,8 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
                         sigma_R = R(left_sigma_R, sigma_R_jp)
 
                         new_sigma = sigma_R
+                        # update the existing term to make room for the new term
+                        antecedents[p][jR_p]['sigma'] = new_sigma
                     elif jR_p is None:
                         cL_jp = antecedents[p][jL_p]['center']
                         sigma_L_jp = antecedents[p][jL_p]['sigma']
@@ -98,6 +100,8 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
                         sigma_L = R(left_sigma_L, sigma_L_jp)
 
                         new_sigma = sigma_L
+                        # update the existing term to make room for the new term
+                        antecedents[p][jL_p]['sigma'] = new_sigma
                     else:
                         cR_jp = antecedents[p][jR_p]['center']
                         sigma_R_jp = antecedents[p][jR_p]['sigma']
@@ -110,6 +114,8 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
                         sigma_L = R(left_sigma_L, sigma_L_jp)
 
                         new_sigma = R(sigma_R, sigma_L)
+                        # update the existing terms to make room for the new term
+                        antecedents[p][jR_p]['sigma'] = antecedents[p][jL_p]['sigma'] = new_sigma
                     antecedents[p].append({'center':new_c, 'sigma':new_sigma, 'support':1})
     return antecedents
 
