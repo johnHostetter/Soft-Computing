@@ -71,6 +71,7 @@ def evaluate_on_environment(env, n_trials=100, epsilon=0.0, render=False):
 
     def scorer(algo, *args):
         episode_rewards = []
+        rule_activations_during_end = []  # keep track of what rules led to end of episode
         for _ in range(n_trials):
             observation = env.reset()
             episode_reward = 0.0
@@ -86,9 +87,10 @@ def evaluate_on_environment(env, n_trials=100, epsilon=0.0, render=False):
                     env.render()
 
                 if done:
+                    rule_activations_during_end.append(algo.agent.flcs[0].current_rule_activations)
                     break
             episode_rewards.append(episode_reward)
-        return np.mean(episode_rewards), np.std(episode_rewards)
+        return np.mean(episode_rewards), np.std(episode_rewards), rule_activations_during_end
 
     return scorer
 
@@ -338,13 +340,15 @@ def offline_q_learning(model, training_dataset, validation_dataset, max_epochs=1
         epoch += 1
     return model, train_epoch_losses, val_epoch_losses
 
+
 if __name__ == "__main__":
     SAVE = False
     val_loss_df = None
     train_loss_df = None
     online_evaluation_df = None
-    print('Start at seed {} and end before seed {}'.format(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])))
-    for SEED in range(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])):
+    # print('Start at seed {} and end before seed {}'.format(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])))
+    # for SEED in range(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])):
+    for SEED in [39]:
         print('Using seed {}'.format(SEED))
         os.environ['PYTHONHASHSEED'] = str(SEED)
         torch.manual_seed(SEED)
@@ -367,7 +371,8 @@ if __name__ == "__main__":
 
         seed_df = None
         dataset = dataset[:1000]
-        for num_of_train_episodes in range(10, 251, 10):
+        # for num_of_train_episodes in range(10, 251, 10):
+        for num_of_train_episodes in [250]:
             print('num of training episodes available: {}'.format(num_of_train_episodes))
             # split train and test episodes
             train_episodes, val_episodes = train_test_split(dataset, test_size=0.2)
@@ -401,6 +406,7 @@ if __name__ == "__main__":
             from sklearn.preprocessing import Normalizer
 
             transformer = Normalizer().fit(train_X)
+            # train_X = transformer.transform(train_X)
 
             # get replay results
             from neuro_q_net import MIMO_replay
@@ -438,18 +444,70 @@ if __name__ == "__main__":
             # val = (num_of_train_episodes / 10) * np.log(2 + np.sqrt(3)*t)
             # cql_alpha = 1 / (1 + np.exp(val))
             cql_alpha = 0.5
-            print('CQL Alpha: {}'.format(cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
-            offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=0.5,
-                                       learning_rate=1e-4)
+            print('CQL Alpha: {}'.format(
+                cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
+            offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=cql_alpha,
+                                       learning_rate=1e-1)
 
-            batch_size = 64
-            offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
-                                                                                    val_trajectories, EPOCHS, batch_size,
-                                                                                    gamma=0.99)  # gamma was 0.5
+            # # the following specs should solve the cart pole problem
+            #
+            # # for action 0 (i.e., flcs[0]),
+            # flc_0_qs = np.array([4.09273247, 2.99155165, 1.69529502, 0.9554578, 3.38400144, 4.03330933,
+            #                      3.94449846, 2.29485375, 1.43395984, 3.49536297, 3.66994179, 2.94600878,
+            #                      2.06561499, 3.20644239, 2.88323048, 2.97839352, 2.75879564, 2.44817454,
+            #                      3.6129228])
+            # # for action 1 (i.e., flcs[1]),
+            # flc_1_qs = np.array([4.08707284, 2.95673377, 1.69364686, 0.95616081, 3.32566896, 3.98658785,
+            #                      3.99590144, 2.33340544, 1.45550679, 3.55704939, 3.68730338, 3.00891885,
+            #                      2.10325604, 3.24888868, 2.88073079, 3.03985276, 2.77599565, 2.34069858,
+            #                      3.57920188])
+
+            # the following specs will come close to solving (i.e., 381 avg +- 101)
+            # for action 0 (i.e., flcs[0]),
+            flc_0_qs = np.array([32.23857237, 20.56550323, 27.55988969, 25.99648251, 16.35570309, 18.95074817,
+                                 12.4922282, 21.3039934, 11.58842305, 5.90257348, 3.19148588, 30.84851585,
+                                 29.50740081, 24.88781145, 29.93867306, 22.45899488, 29.64593866, 27.79719068,
+                                 20.13681364, 13.21699227, 15.90490055, 3.14113929, 26.80655194, 25.76440097,
+                                 12.9910143, 11.86838104, 7.07246614, 5.06043945, -0.58641758, 10.90387111,
+                                 27.27257721, 18.67683394])
+            # for action 1 (i.e., flcs[1]),
+            flc_1_qs = np.array([32.24291762, 20.01849851, 27.33601231, 26.12146665, 15.51193979, 19.22837849,
+                                 12.4818727, 21.71117879, 11.66582381, 5.87689104, 3.17553727, 30.94495598,
+                                 29.32600965, 25.56327505, 29.4906996, 22.89623226, 30.27304413, 27.94220619,
+                                 20.33806456, 13.44641513, 15.71906733, 3.48654253, 27.14557043, 26.12270416,
+                                 13.41508282, 12.44581132, 7.35404242, 5.33562759, -0.53207424, 11.05446885,
+                                 27.47501511, 19.20216549])
+
+            ### START OF TRAINING ###
+
+            if False:
+                batch_size = 64
+                offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
+                                                                                        val_trajectories, EPOCHS,
+                                                                                        batch_size,
+                                                                                        gamma=0.99)  # gamma was 0.5
+                for flc_idx, flc in enumerate(offline_mimo.flcs):
+                    print('{}: {}'.format(flc_idx, flc.y))
+
+                for idx, flc in enumerate(offline_mimo.flcs):
+                    flc.save('{}'.format(idx))
+            else:
+                print(flc_0_qs[20], flc_1_qs[20])
+                print(rules_[20])
+                # flc_0_qs[20] = 17  # 18 also works, 18.5 starts to not work
+                offline_mimo.flcs[0].y = flc_0_qs
+                offline_mimo.flcs[1].y = flc_1_qs
+                for idx, flc in enumerate(offline_mimo.flcs):
+                    flc.save('{}'.format(idx))
+            ### END OF TRAINING
 
             from neuro_q_net import EvaluationWrapper
 
-            avg_score, std_score = evaluate_on_environment(env)(EvaluationWrapper(offline_mimo))
+            avg_score, std_score, curr_rules_during_end = evaluate_on_environment(env)(EvaluationWrapper(offline_mimo))
+            tmp = np.array([curr_rules[0] for curr_rules in curr_rules_during_end])
+            counts = np.unique(tmp.argmax(axis=1), return_counts=True)
+            print(counts)
+            print((avg_score, std_score))
             # save the training losses
             loss_df = pd.DataFrame({'policy': ['FCQL'] * len(train_epoch_losses),
                                     'epoch': range(len(train_epoch_losses)),
@@ -468,6 +526,19 @@ if __name__ == "__main__":
                 seed_df = loss_df
             else:
                 seed_df = pd.concat([seed_df, loss_df])
+
+            # the following specs should solve the cart pole problem
+
+            # for action 0 (i.e., flcs[0]),
+            flc_0_qs = np.array([0.01797587, 0.01548789, 0.01624808, 0.01517777, 0.01444484,
+                                 0.01334789, 0.01096193, 0.01500386, 0.01313595, 0.00786661,
+                                 0.01302805, 0.00839448, 0.00506901, 0.01796555, 0.01735124,
+                                 0.01529711, 0.01492031, 0.01733455])
+            # for action 1 (i.e., flcs[1]),
+            flc_1_qs = np.array([0.01794827, 0.01504194, 0.01596201, 0.01499904, 0.0139775,
+                                 0.01357084, 0.01123002, 0.01522818, 0.01342868, 0.00802537,
+                                 0.01320628, 0.00850744, 0.00512792, 0.01793559, 0.01715578,
+                                 0.01545542, 0.01472266, 0.01750127])
 
             if SAVE:
                 # save the training losses

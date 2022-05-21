@@ -12,6 +12,7 @@ import torch
 import random
 import warnings
 import numpy as np
+import pandas as pd
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
@@ -140,6 +141,170 @@ class FLC(AdaptiveNeuroFuzzy):
     def legacy_predict(self, x):
         # fuzzy inference
         return self.legacy_a(x) / self.legacy_b(x)
+
+    def export_antecedents(self):
+        """
+        Export the antecedent terms for each input variable of the Neuro-Fuzzy network into a Pandas DataFrame representation.
+
+        Returns
+        -------
+        Pandas DataFrame
+            The antecedent terms for each input variable.
+
+        """
+        all_antecedents = []
+        for input_idx, antecedents_for_input in enumerate(self.antecedents):
+            for term_idx, antecedent in enumerate(antecedents_for_input):
+                antecedent['input_variable'] = input_idx
+                antecedent['term_index'] = term_idx
+                all_antecedents.append(antecedent)
+        return pd.DataFrame(all_antecedents)
+
+    def export_consequents(self):
+        """
+        Export the consequent terms for each output variable of the Neuro-Fuzzy network into a Pandas DataFrame representation.
+
+        Returns
+        -------
+        Pandas DataFrame
+            The consequent terms for each output variable.
+
+        """
+        all_consequents = []
+        for input_idx, consequents_for_input in enumerate(self.consequents):
+            for term_idx, consequent in enumerate(consequents_for_input):
+                consequent['output_variable'] = input_idx
+                consequent['term_index'] = term_idx
+                all_consequents.append(consequent)
+        return pd.DataFrame(all_consequents)
+
+    def export_q_values(self):
+        """
+        Export the Q-values for each fuzzy logic rule of the Neuro-Fuzzy network into a Pandas DataFrame representation.
+        The i'th row corresponds to the i'th fuzzy logic rule in the Neuro-Fuzzy network (order matters).
+        The j'th column corresponds to the j'th possible action's Q-value.
+
+        Returns
+        -------
+        Pandas DataFrame
+            The Q-values for each fuzzy logic rule's possible actions.
+
+        """
+        return pd.DataFrame(self.y)
+
+    def export_rules(self):
+        """
+        Export the fuzzy logic rules of the Neuro-Fuzzy network into a Pandas DataFrame representation.
+
+        Returns
+        -------
+        Pandas DataFrame
+            The fuzzy logic rules.
+
+        """
+        return pd.DataFrame(self.rules)
+
+    def save(self, file_name):
+        """
+        Save this Neuro-Fuzzy network for future use. The output is '.csv' files.
+
+        Parameters
+        ----------
+        file_name : TYPE
+            The name of a file or file path to use in saving the Neuro-Fuzzy network.
+            Should not include the '_q_values.csv', '_rules.csv', '_antecedents.csv', etc. extensions.
+            These are automatically appended by the 'save' function.
+
+        Returns
+        -------
+        None.
+
+        """
+        antecedents_df = self.export_antecedents()
+        consequents_df = self.export_consequents()
+        q_values_df = self.export_q_values()
+        rules_df = self.export_rules()
+        antecedents_df.to_csv('{}_antecedents.csv'.format(file_name), sep=',', index=False)
+        consequents_df.to_csv('{}_consequents.csv'.format(file_name), sep=',', index=False)
+        q_values_df.to_csv('{}_q_values.csv'.format(file_name), sep=',', index=False)
+        rules_df.to_csv('{}_rules.csv'.format(file_name), sep=',', index=False)
+
+    def load(self, file_name):
+        """
+        Load an existing Neuro-Fuzzy network that has been trained or untrained.
+
+        Parameters
+        ----------
+        file_name : string
+            The name of a file or file path to use in locating the saved Neuro-Fuzzy network.
+            Should not include the '_q_values.csv', '_rules.csv', '_antecedents.csv', etc. extensions.
+            These are automatically appended by the 'save' function.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.y = pd.read_csv('{}_q_values.csv'.format(file_name)).values
+        self.rules = pd.read_csv(
+            '{}_rules.csv'.format(file_name)).to_dict('records')
+
+        # convert the rules' antecedents and consequents references from the string representation to the Numpy format
+        for rule in self.rules:
+            antecedents_indices_list = rule['A'][1:-1].split(' ')
+            antecedents_indices_list = np.array(
+                [int(index) for index in antecedents_indices_list])
+            rule['A'] = antecedents_indices_list
+            consequents_indices_list = rule['C'][1:-1].split(' ')
+            consequents_indices_list = np.array(
+                [int(index) for index in consequents_indices_list])
+            rule['C'] = consequents_indices_list
+
+        antecedents = pd.read_csv(
+            '{}_antecedents.csv'.format(file_name)).to_dict('records')
+        # the loaded antecedents need to be reformatted so they are first indexed by their input variable's index
+        self.antecedents = []
+        current_input_variable_index = 0
+        current_input_variable_antecedents = []
+        for antecedent in antecedents:
+            if antecedent['input_variable'] == current_input_variable_index:
+                current_input_variable_antecedents.append(antecedent)
+            else:
+                current_input_variable_index = antecedent['input_variable']
+                self.antecedents.append(current_input_variable_antecedents)
+                current_input_variable_antecedents = [antecedent]
+        # add the last created current_input_variable_antecedents
+        current_input_variable_index = antecedent['input_variable']
+        self.antecedents.append(current_input_variable_antecedents)
+        current_input_variable_antecedents = []
+
+        # for simplicity, the consequents are loaded again, however, they are not used for inference, but are used to generate the Neuro-Fuzzy network
+        consequents = pd.read_csv(
+            '{}_consequents.csv'.format(file_name)).to_dict('records')
+        # the loaded consequents need to be reformatted so they are first indexed by their output variable's index
+        self.consequents = []
+        current_output_variable_index = 0
+        current_output_variable_consequents = []
+        for consequent in consequents:
+            if consequent['output_variable'] == current_output_variable_index:
+                current_output_variable_consequents.append(consequent)
+            else:
+                current_output_variable_index = consequent['output_variable']
+                self.consequents.append(current_output_variable_consequents)
+                current_output_variable_consequents = [consequent]
+        # add the last created current_output_variable_consequents
+        current_output_variable_index = consequent['output_variable']
+        self.consequents.append(current_output_variable_consequents)
+        current_output_variable_consequents = []
+
+        # currently, the weights of each rule are not saved since they do not matter at this point
+        self.weights = np.ones(len(self.rules))
+        # building the Neuro-Fuzzy network
+        self.import_existing(self.rules, self.weights,
+                             self.antecedents, self.consequents)
+        self.orphaned_term_removal()
+        self.preprocessing()
+        self.update()
 
 
 class AdamOptim():

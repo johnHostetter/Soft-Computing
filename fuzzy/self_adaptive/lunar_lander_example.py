@@ -143,7 +143,7 @@ def lunar_lander(env, model=None):
                 # sample random actions
                 action = env.action_space.sample()
             else:
-                q_values = model.predict(state)
+                q_values = model.predict([state])
                 action = np.argmax(q_values.numpy())
             # take action and extract results
             next_state, reward, done, _ = env.step(action)  # take a random action
@@ -163,6 +163,8 @@ def lunar_lander(env, model=None):
 
 action_set_length = env.action_space.n
 trajectories, random_rewards, train_X = lunar_lander(env)
+val_trajectories, _, val_X = lunar_lander(env)
+
 
 # X = [trajectories[0][0]]
 # for idx, trajectory in enumerate(trajectories):
@@ -188,31 +190,43 @@ except ModuleNotFoundError:
 
 rules_, weights_, antecedents_, consequents_ = unsupervised(train_X, None)
 print('There are {} rules'.format(len(rules_)))
-mimo = MIMO_replay(antecedents_, rules_, 2, consequents_, 0., .1)
+# mimo = MIMO_replay(antecedents_, rules_, 2, consequents_, 0., .1)
 
 
 # replay = q_learning(env, mimo, episodes, gamma=.9, epsilon=1.0,
 #                     replay=True, title='Mamdani Neuro-Fuzzy Q-Network')
 
-def offline_q_learning(model, training_dataset, gamma=0.9, n_update=10):
-    number_of_iterations = 20
-    number_of_batches = 50
-    batch_size = 60
-    for i in range(number_of_iterations):
-        print(i)
-        # Update target network every n_update steps
-        for j in range(number_of_batches):
-            # if j % n_update == 0:
-            #     model.target_update()
-            model.replay(training_dataset, batch_size, gamma, online=False)
-    return model
+def offline_q_learning(model, training_dataset, validation_dataset, max_epochs=12, batch_size=32, gamma=0.9):
+    epoch = 0
+    threshold = 1e-2
+    val_epoch_losses = []
+    train_epoch_losses = []
+    prev_val_loss = curr_val_loss = 1e10
+    while threshold < curr_val_loss <= prev_val_loss and epoch < max_epochs:
+        prev_val_loss = curr_val_loss
+        train_losses, val_losses = model.replay(training_dataset, batch_size, validation_dataset, gamma, online=False)
+        curr_val_loss = val_losses.mean()
+        print('epoch {}: avg. train loss = {} & avg. val loss = {}'
+              .format(epoch, train_losses.mean(), val_losses.mean()))
+        train_epoch_losses.append(train_losses.mean())
+        val_epoch_losses.append(val_losses.mean())
+        epoch += 1
+    return model, train_epoch_losses, val_epoch_losses
 
 
 from neuro_q_net import DoubleMIMO
 
 num_of_actions = 4
-offline_mimo = MIMO_replay(antecedents_, rules_, num_of_actions, consequents_, 0.2, .1)
-offline_mimo = offline_q_learning(offline_mimo, trajectories, 0.99)
+from sklearn.preprocessing import Normalizer
+
+transformer = Normalizer().fit(train_X)
+offline_mimo = MIMO_replay(transformer, antecedents_, rules_, num_of_actions, consequents_, cql_alpha=0.5,
+                           learning_rate=1e-4)
+EPOCHS = 12
+batch_size = 64
+offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
+                                                                        val_trajectories, EPOCHS, batch_size,
+                                                                        gamma=0.99)  # gamma was 0.5
 _, offline_scores, _ = lunar_lander(env, offline_mimo)
 print(offline_scores)
 print('avg.: {}'.format(np.mean(offline_scores)))
