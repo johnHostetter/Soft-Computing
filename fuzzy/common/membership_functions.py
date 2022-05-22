@@ -60,5 +60,6 @@ class Gaussian(nn.Module):
         Forward pass of the function.
         Applies the function to the input elementwise.
         """
-        self.sigmas = Parameter(torch.abs(self.sigmas))  # constrain the sigma values to only be positive
-        return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(self.sigmas, 2)))
+        # torch.sigmoid(self.sigmas) constrain the sigma values to only be (0, 1)
+        # https://stackoverflow.com/questions/65022269/how-to-use-a-learnable-parameter-in-pytorch-constrained-between-0-and-1
+        return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(torch.sigmoid(self.sigmas), 2)))
