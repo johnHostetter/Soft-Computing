@@ -11,6 +11,17 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 
 
+class Clamp(torch.autograd.Function):
+    # https://discuss.pytorch.org/t/regarding-clamped-learnable-parameter/58474/3
+    @staticmethod
+    def forward(ctx, input):
+        return input.clamp(min=1e-1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output.clone()
+
+
 class Gaussian(nn.Module):
     """
     Implementation of the Gaussian membership function.
@@ -27,7 +38,7 @@ class Gaussian(nn.Module):
         # >>> x = a1(x)
     """
 
-    def __init__(self, in_features, centers=None, sigmas=None):
+    def __init__(self, in_features, centers=None, sigmas=None, trainable=True):
         """
         Initialization.
         INPUT:
@@ -44,16 +55,26 @@ class Gaussian(nn.Module):
         if centers is None:
             self.centers = Parameter(torch.randn(self.in_features))
         else:
-            self.centers = Parameter(torch.tensor(centers))
+            self.centers = torch.tensor(centers)
+            # self.centers = Parameter(torch.tensor(centers))
 
         # initialize sigmas
         if sigmas is None:
             self.sigmas = Parameter(torch.abs(torch.randn(self.in_features)))
         else:
-            self.sigmas = Parameter(torch.abs(torch.tensor(sigmas)))
+            # we assume the sigmas are given to us correctly, we use the inverse of sigmoid
+            # to convert the values, because later during training we need to ensure sigmas are within (0, 1)
+            self.sigmas = torch.abs(torch.tensor(sigmas))
+            # if trainable:
+            #     a = torch.max(sigmas).item() * 2  # this is the maximum allowed sigma!!
+            #     sigmas = (torch.log((1/a) * sigmas) - torch.log(1 - (1/a) * sigmas))
+            # self.sigmas = Parameter(sigmas)
 
-        self.centers.requires_grad = True
-        self.sigmas.requiresGrad = True
+        self.centers.requires_grad = trainable
+        self.sigmas.requiresGrad = trainable
+        self.centers.grad = None
+        self.sigmas.grad = None
+
 
     def forward(self, x):
         """
@@ -62,4 +83,13 @@ class Gaussian(nn.Module):
         """
         # torch.sigmoid(self.sigmas) constrain the sigma values to only be (0, 1)
         # https://stackoverflow.com/questions/65022269/how-to-use-a-learnable-parameter-in-pytorch-constrained-between-0-and-1
-        return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(torch.sigmoid(self.sigmas), 2)))
+
+        return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(self.sigmas, 2)))
+
+        if not self.sigmas.requires_grad:
+            return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(self.sigmas, 2)))
+        else:
+            clamp_class = Clamp()
+            return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(clamp_class.apply(self.sigmas), 2)))
+
+            # return torch.exp(-1.0 * (torch.pow(x - self.centers, 2) / torch.pow(torch.sigmoid(self.sigmas), 2)))

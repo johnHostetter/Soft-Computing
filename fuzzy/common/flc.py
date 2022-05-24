@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from torch import optim
 from torch.nn.parameter import Parameter
-from membership_functions import Gaussian
+from fuzzy.common.membership_functions import Gaussian
 
 
 class FLC(nn.Module):
@@ -56,8 +56,12 @@ class FLC(nn.Module):
             num_of_antecedents[input_variable_idx] = len(antecedents[input_variable_idx])
             self.input_variable_ids.append(set())
             for term_idx, antecedent in enumerate(antecedents[input_variable_idx]):
-                gaussians['centers'].append(antecedent['parameters']['center'])
-                gaussians['sigmas'].append(antecedent['parameters']['sigma'])
+                try:
+                    gaussians['centers'].append(antecedent['parameters']['center'])
+                    gaussians['sigmas'].append(antecedent['parameters']['sigma'])
+                except KeyError:
+                    gaussians['centers'].append(antecedent['center'])
+                    gaussians['sigmas'].append(antecedent['sigma'])
                 antecedent['id'] = unique_id
                 self.input_variable_ids[-1].add(unique_id)
                 unique_id += 1
@@ -68,22 +72,30 @@ class FLC(nn.Module):
         self.links_between_antecedents_and_rules = np.zeros((num_of_antecedents.sum(), n_rules))
 
         for rule_idx, rule in enumerate(rules):
-            for input_variable_idx, term_idx in enumerate(rule['antecedents']):
-                new_term_idx = antecedents[input_variable_idx][term_idx]['id']
-                self.links_between_antecedents_and_rules[new_term_idx, rule_idx] = 1
+            try:
+                for input_variable_idx, term_idx in enumerate(rule['antecedents']):
+                    new_term_idx = antecedents[input_variable_idx][term_idx]['id']
+                    self.links_between_antecedents_and_rules[new_term_idx, rule_idx] = 1
+            except KeyError:
+                for input_variable_idx, term_idx in enumerate(rule['A']):
+                    new_term_idx = antecedents[input_variable_idx][term_idx]['id']
+                    self.links_between_antecedents_and_rules[new_term_idx, rule_idx] = 1
 
         # begin creating the model's layers
         self.input_terms = Gaussian(in_features=self.in_features, centers=gaussians['centers'],
-                                    sigmas=gaussians['sigmas'])
+                                    sigmas=gaussians['sigmas'], trainable=False)
 
         # initialize consequences
         if consequences is None:
             num_of_consequent_terms = len(rules)
-            self.consequences = Parameter(torch.randn(num_of_consequent_terms, out_features))
+            # self.consequences = Parameter(torch.randn(num_of_consequent_terms, out_features))
+            self.consequences = Parameter(torch.zeros(num_of_consequent_terms, out_features))
         else:
             self.consequences = Parameter(torch.tensor(consequences))
 
         self.consequences.requires_grad = True
+        # self.consequences.requires_grad = False
+        # self.consequences.grad = None
 
     def __transform(self, x):
         """
@@ -101,7 +113,7 @@ class FLC(nn.Module):
                 (n_observations, copies))
         return torch.tensor(new_x)
 
-    def forward(self, x):
+    def forward(self, x, other_rules=None):
         """
         Forward pass of the function.
         Applies the function to the input elementwise.
@@ -114,11 +126,14 @@ class FLC(nn.Module):
         terms_to_rules[terms_to_rules == 0] = 1.0  # ignore zeroes, this is from the weights between terms and rules
         # the shape of terms_to_rules is (num of observations, num of ALL terms, num of rules)
         rules_applicability = terms_to_rules.prod(dim=1)
-        numerator = torch.matmul(rules_applicability, self.consequences.double())
-        # numerator = (rules_applicability * self.consequences).sum(dim=1)
+        # numerator = torch.matmul(rules_applicability, self.consequences.double())  # mimo
+        numerator = (rules_applicability * self.consequences.T[0]).sum(dim=1)  # miso
         denominator = rules_applicability.sum(dim=1)
-        # return numerator / denominator  # the dim=1 is taking product across ALL terms, now shape (num of observations, num of rules)
-        return numerator / denominator[:, None]  # shape is (num of observations, num of actions)
+        return numerator / denominator  # the dim=1 is taking product across ALL terms, now shape (num of observations, num of rules), miso
+        return numerator / denominator[:, None]  # shape is (num of observations, num of actions), mimo
+
+    def predict(self, x, other_rules=None):
+        return self.forward(x, other_rules)
 
 
 # helper function to train a model
@@ -136,7 +151,7 @@ def train_model(model, X, actual_y):
     # define learning rate
     learning_rate = 0.003
     # define number of epochs
-    epochs = 20
+    epochs = 100
     # initialize optimizer
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 

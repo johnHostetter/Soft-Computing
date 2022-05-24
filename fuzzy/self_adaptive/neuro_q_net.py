@@ -14,9 +14,10 @@ import warnings
 import numpy as np
 import pandas as pd
 
-warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
-
+from torch.utils.data import Dataset, DataLoader
 from fuzzy.neuro.adaptive import AdaptiveNeuroFuzzy
+
+warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 
 # Yield successive n-sized chunks from l.
@@ -349,6 +350,8 @@ class AdamOptim():
             b = np.nan
         return w, b
 
+from torch import optim
+from fuzzy.common.flc import FLC as torchFLC
 
 class MIMO:
     def __init__(self, normalizer, antecedents, rules, n_outputs, consequent_term, cql_alpha, learning_rate=1e-3):
@@ -358,6 +361,10 @@ class MIMO:
         self.learning_rate = learning_rate
         self.adam = AdamOptim(eta=learning_rate)
         self.flcs = []
+
+        # PyTorch implementation?
+        self.model = torchFLC(len(antecedents), n_outputs, antecedents, rules)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
 
         for _ in range(n_outputs):
             consequents = np.zeros(len(rules))
@@ -400,10 +407,11 @@ class MIMO:
 
         return np.array(flc_outputs)
 
-    def calc_offline_loss(self, flc_outputs, y, action_indices):
+    def calc_offline_loss(self, X, y, action_indices):
         target_qvalues = torch.tensor(y, dtype=torch.float32)
         action_indices = torch.tensor(action_indices, dtype=torch.int64)
-        pred_qvalues = torch.tensor(flc_outputs, dtype=torch.float32)
+        pred_qvalues = self.model(X)
+        # pred_qvalues = torch.tensor(flc_outputs, dtype=torch.float32)
         logsumexp_qvalues = torch.logsumexp(pred_qvalues, dim=-1)
 
         tmp_pred_qvalues = pred_qvalues.gather(
@@ -417,15 +425,20 @@ class MIMO:
     def offline_update(self, train_X, train_y, train_action_indices, val_X, val_y, val_action_indices):
         # calculate the outputs
 
-        train_flc_outputs = self.predict(train_X).numpy()
-        val_flc_outputs = self.predict(val_X).numpy()
+        # train_flc_outputs = self.predict(train_X).numpy()
+        # val_flc_outputs = self.predict(val_X).numpy()
 
         # calculate the loss for reporting & monitoring
 
-        train_loss = self.calc_offline_loss(train_flc_outputs, train_y, train_action_indices)
-        val_loss = self.calc_offline_loss(val_flc_outputs, val_y, val_action_indices)
+        train_loss = self.calc_offline_loss(train_X, train_y, train_action_indices)
+        val_loss = self.calc_offline_loss(val_X, val_y, val_action_indices)
 
         # gradient descent
+        self.optimizer.zero_grad()
+        train_loss.backward()
+        self.optimizer.step()
+
+        return train_loss, val_loss
 
         for flc_idx, flc in enumerate(self.flcs):
             if train_y.ndim == 1:  # single observation
@@ -478,6 +491,8 @@ class MIMO_replay(MIMO):
 
     def replay(self, train_memory, size, validation_memory, gamma=0.9, online=True):
         """ Add experience replay to the DQN network class. """
+        # train_loader = DataLoader(train_memory, batch_size=size, shuffle=True, num_workers=2)
+        # val_loader = DataLoader(validation_memory, batch_size=size, shuffle=False, num_workers=2)
         # Make sure the memory is big enough
         if len(train_memory) >= size:
             # Sample a batch of experiences from the agent's memory
@@ -503,8 +518,8 @@ class MIMO_replay(MIMO):
                 else:
                     train_loss, val_loss = self.offline_update(train_states, train_targets, train_action_indices,
                                                                val_states, val_targets, val_action_indices)
-                train_losses.append(train_loss)
-                val_losses.append(val_loss)
+                train_losses.append(float(train_loss))
+                val_losses.append(float(val_loss))
             return np.array(train_losses), np.array(val_losses)
 
 
