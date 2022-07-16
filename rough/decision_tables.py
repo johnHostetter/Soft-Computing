@@ -27,37 +27,74 @@ class DecisionTable:
         self.decision_attributes = decision_attributes
         self.all_decision_rule_ids = Universe(set(self.data.index))
         self.lookup_table = {}
+        self.ordered_columns = None
         self.equivalence_relation_family = self.make_equivalence_relation_family()  # populate the lookup table
 
-    def simplify(self):
-        decision_table = self  # there is a distinct separation between self and this decision table
+    def simplify(self, in_place=True):
+        if in_place:
+            # step 1: remove unnecessary columns from the decision table
 
-        # step 1: remove unnecessary columns from the decision table
+            idx = 0
+            num_of_remaining_columns = len(self.condition_attributes)
+            prev_num_of_remaining_columns = num_of_remaining_columns + 1
+            while num_of_remaining_columns < prev_num_of_remaining_columns:
+            # while not self.equivalence_relation_family.independent():
+                prev_num_of_remaining_columns = num_of_remaining_columns
+                print('removing column %s...' % idx)
+                idx += 1
+                self.remove_unnecessary_columns(in_place)
+                num_of_remaining_columns = len(self.condition_attributes)
 
-        while not decision_table.equivalence_relation_family.independent():
-            new_decision_table = decision_table.remove_unnecessary_columns()
-            if new_decision_table is None:
-                break
-            else:
-                decision_table = new_decision_table
+            # step 2: keep only the core values
 
-        # step 2: keep only the core values
+            core_values_matrix = self.make_core_values_matrix()
 
-        core_values_matrix = decision_table.make_core_values_matrix()
+            # step 2a: search for the best reducts -- ideally, those that reduce the length of the rule base
 
-        # step 2a: search for the best reducts -- ideally, those that reduce the length of the rule base
+            for decision_rule_id in self.all_decision_rule_ids:
+                attribute_reducts = self.decision_rule_attribute_reducts(decision_rule_id)
+                if len(attribute_reducts) > 0:
+                    selected_reduct_index = 0  # TODO: pick the first one, it doesn't matter for now
+                    selected_reduct = attribute_reducts[selected_reduct_index]
 
-        for decision_rule_id in decision_table.all_decision_rule_ids:
-            attribute_reducts = decision_table.decision_rule_attribute_reducts(decision_rule_id)
-            selected_reduct_index = 0  # TODO: pick the first one, it doesn't matter for now
-            selected_reduct = attribute_reducts[selected_reduct_index]
+                    for condition_attribute in selected_reduct:
+                        core_values_matrix.at[decision_rule_id, condition_attribute] = self.data.loc[decision_rule_id, condition_attribute]
 
-            for condition_attribute in selected_reduct:
-                core_values_matrix.at[decision_rule_id, condition_attribute] = decision_table.data.loc[decision_rule_id, condition_attribute]
+            # step 2b: remove duplicate rules
 
-        # step 2b: remove duplicate rules
+            minimal_decision_table = core_values_matrix.drop_duplicates(
+                subset=self.condition_attributes.elements)
+        else:
 
-        minimal_decision_table = core_values_matrix.drop_duplicates(subset=decision_table.condition_attributes.elements)
+            decision_table = self  # there is a distinct separation between self and this decision table
+
+            # step 1: remove unnecessary columns from the decision table
+
+            while not decision_table.equivalence_relation_family.independent():
+                new_decision_table = decision_table.remove_unnecessary_columns()
+                if new_decision_table is None:
+                    break
+                else:
+                    decision_table = new_decision_table
+
+            # step 2: keep only the core values
+
+            core_values_matrix = decision_table.make_core_values_matrix()
+
+            # step 2a: search for the best reducts -- ideally, those that reduce the length of the rule base
+
+            for decision_rule_id in decision_table.all_decision_rule_ids:
+                attribute_reducts = decision_table.decision_rule_attribute_reducts(decision_rule_id)
+                if len(attribute_reducts) > 0:
+                    selected_reduct_index = 0  # TODO: pick the first one, it doesn't matter for now
+                    selected_reduct = attribute_reducts[selected_reduct_index]
+
+                    for condition_attribute in selected_reduct:
+                        core_values_matrix.at[decision_rule_id, condition_attribute] = decision_table.data.loc[decision_rule_id, condition_attribute]
+
+            # step 2b: remove duplicate rules
+
+            minimal_decision_table = core_values_matrix.drop_duplicates(subset=decision_table.condition_attributes.elements)
 
         return minimal_decision_table
 
@@ -118,28 +155,53 @@ class DecisionTable:
                     attribute_reducts.add(subset)
 
         # find the element that is the smallest w.r.t. length
-        smallest_element = min(attribute_reducts, key=len)
-        # get rid of larger reducts, keep only the smallest
-        attribute_reducts = [reduct for reduct in attribute_reducts if len(reduct) == len(smallest_element)]
+        if len(attribute_reducts) > 0:
+            smallest_element = min(attribute_reducts, key=len)
+            # get rid of larger reducts, keep only the smallest
+            attribute_reducts = [reduct for reduct in attribute_reducts if len(reduct) == len(smallest_element)]
+            return attribute_reducts
+        else:
+            return []
 
-        return attribute_reducts
+    def remove_unnecessary_columns(self, in_place):
+        if self.ordered_columns is None:
+            # determining ordering to remove by
+            map = {}
+            for condition_attribute in self.condition_attributes:
+                map[condition_attribute] = self.data[condition_attribute].value_counts().max() / len(self.data)
 
-    def remove_unnecessary_columns(self):
-        # determining ordering to remove by
-        map = {}
-        for condition_attribute in self.condition_attributes:
-            map[condition_attribute] = self.data[condition_attribute].value_counts().max() / len(self.data)
+            sorted_map = sorted(map.items(), key=lambda item: item[1], reverse=True)
+            self.ordered_columns = set([item[0] for item in sorted_map])
 
-        sorted_map = sorted(map.items(), key=lambda item: item[1], reverse=True)
-        ordered_columns = [item[0] for item in sorted_map]
+        if in_place:
+            removed_attributes = set()
+            for condition_attribute in self.ordered_columns:
+                if self.dispensable(condition_attribute):
+                    self.condition_attributes.remove(condition_attribute)  # permanently delete this attribute
+                    columns_to_keep = ['U']
+                    columns_to_keep.extend(self.condition_attributes)
+                    columns_to_keep.extend(self.decision_attributes)
 
-        for condition_attribute in ordered_columns:  # TODO: this is currently converted to list for ordering
-            if self.dispensable(condition_attribute):
-                columns_to_keep = ['U']
-                columns_to_keep.extend(self.condition_attributes - Set(condition_attribute))
-                columns_to_keep.extend(self.decision_attributes)
-                return DecisionTable(self.pandas_dataframe[columns_to_keep], self.condition_attributes - Set(condition_attribute), self.decision_attributes)
-        return None  # None means that no new DecisionTable was made
+                    # update THIS decision table
+                    self.pandas_dataframe = self.pandas_dataframe[columns_to_keep]
+                    columns_to_keep.remove('U')
+                    self.data = self.data[columns_to_keep]  # technically, shouldn't have the 'U' column included
+                    del self.lookup_table[condition_attribute]
+                    self.equivalence_relation_family = EquivalenceRelationFamily(Set(set(self.lookup_table.values())), self.equivalence_relation_family.universe)
+                    removed_attributes.add(condition_attribute)  # add this condition attribute to remove later
+
+            for condition_attribute in removed_attributes:
+                self.ordered_columns.remove(condition_attribute)  # remove this condition attribute from the data
+
+        else:
+            for condition_attribute in self.ordered_columns:
+                if self.dispensable(condition_attribute):
+                    columns_to_keep = ['U']
+                    columns_to_keep.extend(self.condition_attributes - Set(condition_attribute))
+                    columns_to_keep.extend(self.decision_attributes)
+                    self.ordered_columns.remove(condition_attribute)  # remove this condition attribute from the data
+                    return DecisionTable(self.pandas_dataframe[columns_to_keep], self.condition_attributes - Set(condition_attribute), self.decision_attributes)
+            return None  # None means that no new DecisionTable was made
 
     def dispensable(self, condition_attribute):
         R = self.lookup_table[condition_attribute]  # gets the actual equivalence relation for the given attribute
@@ -157,7 +219,8 @@ class DecisionTable:
         equivalence_relations = Set()
         for attribute in self.condition_attributes.union(self.decision_attributes):
             equivalence_class_family = self.make_equivalence_classes_for_attr(attribute)
-            equivalence_relation = equivalence_class_family.make_equivalence_relation()
+            equivalence_relation = equivalence_class_family.R
             equivalence_relations.add(equivalence_relation)
+            print(len(equivalence_relation))
             self.lookup_table[attribute] = equivalence_relation
         return EquivalenceRelationFamily(equivalence_relations, self.all_decision_rule_ids)

@@ -39,6 +39,10 @@ class Set:
     def cardinality(self):
         return len(self.elements)
 
+    def remove(self, element):
+        if element in self.elements:
+            self.elements.remove(element)
+
     def union(self, other):
         other = self.valid_binary_operation_check(other, 'Union')
         return Set(self.elements.union(other.elements), self.universe)
