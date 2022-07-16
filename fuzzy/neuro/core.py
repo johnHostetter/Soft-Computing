@@ -71,7 +71,7 @@ class CoreNeuroFuzzy(object):
 
         denominator = np.power(flat_widths, 2)
         denominator = np.where(denominator == 0.0, np.finfo(np.float64).eps, denominator)  # if there is a zero in the denominator, replace it with the smallest possible float value, otherwise, keep the other values
-        self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / denominator))
+        self.f2 = np.exp(-1.0 * (np.power(activations - flat_centers, 2) / denominator).astype(float))
             
         return self.f2  # shape is (num of inputs, num of all antecedents)
     
