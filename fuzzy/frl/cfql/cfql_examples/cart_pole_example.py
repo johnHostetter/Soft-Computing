@@ -21,8 +21,9 @@ torch.manual_seed(SEED)
 random.seed(SEED)
 np.random.seed(SEED)
 
+
 def play_cart_pole(env, model, num_episodes, gamma=0.0,
-               title = 'CQL', verbose=True):
+                   title='CQL', verbose=True):
     global FUZZY
     """Deep Q Learning algorithm using the DQN. """
 
@@ -57,13 +58,14 @@ def play_cart_pole(env, model, num_episodes, gamma=0.0,
 
         memory.append((state, action, reward, next_state, done))
         final.append(total)
-        episodes.append({'trajectory':memory, 'cummulative reward':total})
-        plot_results(final, title)
+        episodes.append({'trajectory': memory, 'cummulative reward': total})
+        # plot_results(final, title)
 
         if verbose:
             print("episode: {}, total reward: {}".format(episode_i, total))
 
     return episodes, memory, final
+
 
 def plot_results(values, title=''):
     ''' Plot the reward curve and histogram of results over time.'''
@@ -71,10 +73,10 @@ def plot_results(values, title=''):
     # clear_output(wait=True)
 
     # Define the figure
-    f, ax = plt.subplots(nrows=1, ncols=2, figsize=(12,5))
+    f, ax = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
     f.suptitle(title)
     ax[0].plot(values, label='score per run')
-    ax[0].axhline(195, c='red',ls='--', label='goal')
+    ax[0].axhline(195, c='red', ls='--', label='goal')
     ax[0].set_xlabel('Episodes')
     ax[0].set_ylabel('Reward')
     x = range(len(values))
@@ -83,7 +85,7 @@ def plot_results(values, title=''):
     try:
         z = np.polyfit(x, values, 1)
         p = np.poly1d(z)
-        ax[0].plot(x,p(x),"--", label='trend')
+        ax[0].plot(x, p(x), "--", label='trend')
     except:
         print('')
 
@@ -94,6 +96,7 @@ def plot_results(values, title=''):
     ax[1].set_ylabel('Frequency')
     ax[1].legend()
     plt.show()
+
 
 def random_search_cart_pole(env, num_episodes, title='Random Strategy'):
     """ Random search strategy implementation."""
@@ -119,8 +122,9 @@ def random_search_cart_pole(env, num_episodes, title='Random Strategy'):
                 break
         # Add to the final reward
         final.append(total)
-        plot_results(final, title)
+        # plot_results(final, title)
     return memory, final, np.array(states)
+
 
 env = gym.make('CartPole-v1')
 env.seed(SEED)
@@ -143,13 +147,13 @@ trajectories, _, states = random_search_cart_pole(env, n_episodes)
 print('Observation shape:', env.observation_space.shape)
 print('Action length:', env.action_space.n)
 action_set_length = env.action_space.n
-clip_params = {'alpha':0.1, 'beta':0.7}
-fis_params = {'inference_engine':'product'}
+clip_params = {'alpha': 0.1, 'beta': 0.7}
+fis_params = {'inference_engine': 'product'}
 # note this alpha for CQL is different than CLIP's alpha
 cql_params = {
-    'gamma':0.99, 'alpha':0.1, 'batch_size':1028, 'batches':50,
-    'learning_rate':1e-2, 'iterations':100 ,'action_set_length':action_set_length
-    }
+    'gamma': 0.99, 'alpha': 0.1, 'batch_size': 1028, 'batches': 50,
+    'learning_rate': 1e-2, 'iterations': 100, 'action_set_length': action_set_length
+}
 
 cfql = CFQLModel(clip_params, fis_params, cql_params)
 X = [trajectories[0][0]]
