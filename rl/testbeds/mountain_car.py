@@ -27,7 +27,7 @@ class MountainCar:
             else:
                 return self.agent.get_action(state)
 
-    def play(self, agent_is_training):  # agent_is_training is a boolean, True changes agent's parameters
+    def play(self, agent_is_training, exploit=False):  # agent_is_training is a boolean, True changes agent's parameters
         rewards = []
         r = 0
         done = True
@@ -35,7 +35,14 @@ class MountainCar:
         trajectories = []
         visited_states = []
         best_mean_rewards = []
-        while iteration < self.max_episodes:
+
+        continue_loop = iteration < self.max_episodes
+        while continue_loop:
+            if agent_is_training and len(rewards) >= 100:
+                continue_loop = np.mean(rewards[-100:]) < -110.0 and iteration < self.max_episodes
+            else:
+                continue_loop = iteration < self.max_episodes
+
             if done:
                 state_value = self.env.reset()
                 visited_states.append(state_value)
@@ -52,10 +59,10 @@ class MountainCar:
                 if self.verbose:
                     try:
                         print('EPS=', iteration, ' reward=', r,
-                              ' epsilon=', self.agent.model.ee_rate, ' best mean eps=', epsilon)
+                              ' epsilon=', self.agent.model.ee_rate, ' best mean eps=', epsilon, ' avg. reward=', np.mean(rewards[-100:]))
                     except AttributeError:
                         print('EPS=', iteration, ' reward=', r,
-                              ' epsilon=', 0.0, ' best mean eps=', epsilon)
+                              ' epsilon=', 0.0, ' best mean eps=', epsilon, ' avg. reward=', np.mean(rewards[-100:]))
 
                 iteration += 1
                 r = 0
@@ -65,7 +72,7 @@ class MountainCar:
                     try:
                         self.agent.model.ee_rate -= self.agent.model.ee_rate * 0.01
 
-                        if self.agent.model.ee_rate <= 0.2:
+                        if not exploit and self.agent.model.ee_rate <= 0.2:
                             self.agent.model.ee_rate = 0.2
                     except AttributeError:
                         # no ee rate given, assuming greedy policy
@@ -84,7 +91,7 @@ class MountainCar:
                 reward = -1
 
             if agent_is_training:
-                action = self.agent.learn(state_value, reward)
+                action = self.agent.learn(state_value, reward, trajectories)
             else:
                 action = self.get_agent_action(state_value)
 
