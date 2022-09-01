@@ -5,7 +5,7 @@ from fuzzy.denfis.ecm import ECM
 from fuzzy.self_adaptive.clip import CLIP, rule_creation
 
 
-def unsupervised(train_X, trajectories, ecm=False, Dthr=1e-3, verbose=False):
+def unsupervised(train_X, trajectories, alpha=0.2, beta=0.6, ecm=False, Dthr=1e-3, verbose=False):
     """
     Trains the CFQLModel with its AdaptiveNeuroFuzzy object on the provided training data, 'train_X',
     and their corresponding trajectories.
@@ -44,9 +44,6 @@ def unsupervised(train_X, trajectories, ecm=False, Dthr=1e-3, verbose=False):
 
     if verbose:
         print('Creating/updating the membership functions...')
-
-    alpha = 0.2
-    beta = 0.6
 
     start = time.time()
     antecedents = CLIP(train_X, dummy_Y, train_X_mins, train_X_maxes,

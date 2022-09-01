@@ -328,7 +328,7 @@ if __name__ == "__main__":
         seed_df = None
         # dataset = dataset[:1000]
         # for num_of_train_episodes in range(10, 251, 10):
-        for num_of_train_episodes in [60]:
+        for num_of_train_episodes in [10]:
             print('num of training episodes available: {}'.format(num_of_train_episodes))
             # split train and test episodes
             # train_episodes, val_episodes = train_test_split(dataset, test_size=0.2)
@@ -339,8 +339,8 @@ if __name__ == "__main__":
             # mountain_car = MountainCar(0, 10, None, verbose=True)
             # mountain_car.play(False)
             # 10 episodes also works, but some interactions will still require ~2000 time-steps
-            _, trajectories, _ = train_env(max_eps=10)
-            _, val_trajectories, _ = train_env(max_eps=10)
+            _, trajectories, _ = train_env(max_eps=num_of_train_episodes)
+            _, val_trajectories, _ = train_env(max_eps=num_of_train_episodes)
             # _, trajectories, _ = random_play_mountain_car(max_eps=100)
             #
             # env, fis = get_fis_env()
@@ -386,7 +386,7 @@ if __name__ == "__main__":
             # get replay results
             from neuro_q_net import MIMO_replay
 
-            rules_, weights_, antecedents_, consequents_ = unsupervised(train_X, None, ecm=True, Dthr=1e-2)
+            rules_, weights_, antecedents_, consequents_ = unsupervised(train_X, None, alpha=0.2, beta=0.6, ecm=True, Dthr=1e-2)
             print('There are {} rules'.format(len(rules_)))
 
             for input_variable in antecedents_:
@@ -423,7 +423,7 @@ if __name__ == "__main__":
             offline_mimo = MIMO_replay(transformer, antecedents_, rules_, n_action, consequents_, cql_alpha=cql_alpha,
                                        learning_rate=5e-2)
 
-            batch_size = 128
+            batch_size = 32
             offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
                                                                                     val_trajectories, EPOCHS, batch_size,
                                                                                     gamma=0.99)  # gamma was 0.5

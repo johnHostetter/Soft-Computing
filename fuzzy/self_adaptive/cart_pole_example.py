@@ -343,12 +343,14 @@ def offline_q_learning(model, training_dataset, validation_dataset, max_epochs=1
 
 if __name__ == "__main__":
     SAVE = False
+    policy = 'fql'
     val_loss_df = None
     train_loss_df = None
     online_evaluation_df = None
     # print('Start at seed {} and end before seed {}'.format(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])))
     # for SEED in range(int(sys.argv[1]), int(sys.argv[1]) + int(sys.argv[2])):
-    for SEED in [39]:
+    for SEED in range(35, 40):
+    # for SEED in [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]:
         print('Using seed {}'.format(SEED))
         os.environ['PYTHONHASHSEED'] = str(SEED)
         torch.manual_seed(SEED)
@@ -371,8 +373,8 @@ if __name__ == "__main__":
 
         seed_df = None
         dataset = dataset[:1000]
-        # for num_of_train_episodes in range(10, 251, 10):
-        for num_of_train_episodes in [250]:
+        for num_of_train_episodes in range(10, 251, 10):
+        # for num_of_train_episodes in [5]:
             print('num of training episodes available: {}'.format(num_of_train_episodes))
             # split train and test episodes
             train_episodes, val_episodes = train_test_split(dataset, test_size=0.2)
@@ -443,7 +445,7 @@ if __name__ == "__main__":
             # # percent_of_data = num_of_train_episodes / len(dataset)
             # val = (num_of_train_episodes / 10) * np.log(2 + np.sqrt(3)*t)
             # cql_alpha = 1 / (1 + np.exp(val))
-            cql_alpha = 0.5
+            cql_alpha = 0.0
             print('CQL Alpha: {}'.format(
                 cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
             offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=cql_alpha,
@@ -480,7 +482,7 @@ if __name__ == "__main__":
 
             ### START OF TRAINING ###
 
-            if False:
+            if True:
                 batch_size = 64
                 offline_mimo, train_epoch_losses, val_epoch_losses = offline_q_learning(offline_mimo, trajectories,
                                                                                         val_trajectories, EPOCHS,
@@ -509,7 +511,7 @@ if __name__ == "__main__":
             print(counts)
             print((avg_score, std_score))
             # save the training losses
-            loss_df = pd.DataFrame({'policy': ['FCQL'] * len(train_epoch_losses),
+            loss_df = pd.DataFrame({'policy': [policy.upper()] * len(train_epoch_losses),
                                     'epoch': range(len(train_epoch_losses)),
                                     'train_loss': train_epoch_losses, 'val_loss': val_epoch_losses})
             loss_df['train_size'] = num_of_train_episodes
