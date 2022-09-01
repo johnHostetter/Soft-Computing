@@ -9,12 +9,14 @@ Created on Tue Jul 27 12:21:50 2021
 import time
 import numpy as np
 
-from fuzzy.common.membership_functions import gaussian
-
 
 def R(sigma_1, sigma_2):
     # regulator function
     return (1/2) * (sigma_1 + sigma_2)
+
+
+def gaussian_np(x, center, sigma):
+    return np.exp(-1.0 * (np.power(x - center, 2) / np.power(sigma, 2)))
 
 
 def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
@@ -42,7 +44,7 @@ def CLIP(X, Y, mins, maxes, terms=[], alpha=0.2, beta=0.6, theta=1e-8):
             for p in range(len(x)):
                 SM_jps = []
                 for j, A_jp in enumerate(antecedents[p]):
-                    SM_jp = gaussian(x[p], A_jp['center'], A_jp['sigma'])
+                    SM_jp = gaussian_np(x[p], A_jp['center'], A_jp['sigma'])
                     SM_jps.append(SM_jp)
                 j_star_p = np.argmax(SM_jps)
 
@@ -134,7 +136,7 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[],
         for p in range(len(x)):
             SM_jps = []
             for j, A_jp in enumerate(antecedents[p]):
-                SM_jp = gaussian(x[p], A_jp['center'], A_jp['sigma'])
+                SM_jp = gaussian_np(x[p], A_jp['center'], A_jp['sigma'])
                 SM_jps.append(SM_jp)
             CF *= np.max(SM_jps)
             j_star_p = np.argmax(SM_jps)
@@ -145,7 +147,7 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[],
             for q in range(len(d)):
                 SM_jqs = []
                 for j, C_jq in enumerate(consequents[q]):
-                    SM_jq = gaussian(d[q], C_jq['center'], C_jq['sigma'])
+                    SM_jq = gaussian_np(d[q], C_jq['center'], C_jq['sigma'])
                     SM_jqs.append(SM_jq)
                 CF *= np.max(SM_jqs)
                 j_star_q = np.argmax(SM_jqs)
@@ -158,7 +160,7 @@ def rule_creation(X, Y, antecedents, consequents, existing_rules=[],
             for q in range(len(d)):
                 SM_jqs = []
                 for j, C_jq in enumerate(consequents[q]):
-                    SM_jq = gaussian(d[q], C_jq['center'], C_jq['sigma'])
+                    SM_jq = gaussian_np(d[q], C_jq['center'], C_jq['sigma'])
                     SM_jqs.append(SM_jq)
                 CF *= np.max(SM_jqs)
                 j_star_q = np.argmax(SM_jqs)
