@@ -343,7 +343,7 @@ def offline_q_learning(model, training_dataset, validation_dataset, max_epochs=1
 
 if __name__ == "__main__":
     SAVE = False
-    policy = 'fql'
+    policy = 'fcql'
     val_loss_df = None
     train_loss_df = None
     online_evaluation_df = None
@@ -445,7 +445,7 @@ if __name__ == "__main__":
             # # percent_of_data = num_of_train_episodes / len(dataset)
             # val = (num_of_train_episodes / 10) * np.log(2 + np.sqrt(3)*t)
             # cql_alpha = 1 / (1 + np.exp(val))
-            cql_alpha = 0.0
+            cql_alpha = 0.5
             print('CQL Alpha: {}'.format(
                 cql_alpha))  # cql alpha 0.5 with batch size 32 and 100 episodes worked well (i.e., 487.95 +- 30.50225401507239)
             offline_mimo = MIMO_replay(transformer, antecedents_, rules_, 2, consequents_, cql_alpha=cql_alpha,
