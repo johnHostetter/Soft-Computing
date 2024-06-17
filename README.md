@@ -1,4 +1,12 @@
-# soft_computing
+# Numpy Implementations of Various Soft Computing Algorithms
+
+*Note: This project will no longer be maintained as a newer version, using PyTorch, has been developed. There are likely bugs or errors in this code, so proceed with caution if you intend to use this. I encourage people interested in soft computing, or neuro-fuzzy networks (NFNs), to instead refer to my AAMAS 2023 implementation available [here](https://github.com/johnHostetter/AAMAS-2023-FCQL) (provides PyTorch versions of CLIP, ECM, Fuzzy CQL, NFNs).*
+
+*If this repository was helpful in your research, please consider citing my article:*
+
+*John Wesley Hostetter, Mark Abdelshiheed, Tiffany Barnes, and Min Chi. 2023. A Self-Organizing Neuro-Fuzzy Q-Network: Systematic Design with Offline Hybrid Learning. In Proceedings of the 2023 International Conference on Autonomous Agents and Multiagent Systems (AAMAS '23). International Foundation for Autonomous Agents and Multiagent Systems, Richland, SC, 1248–1257.*
+
+*If this repository was helpful in your work, please consider providing appropriate credit to me wherever applicable.*
 
 The project structure follows the answer provided by np8 to [this](https://stackoverflow.com/questions/714063/importing-modules-from-parent-folder) Stack Overflow question.
 
