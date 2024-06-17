@@ -1,4 +1,4 @@
-# Numpy Implementations of Various Soft Computing Algorithms
+# Numpy Code for Various Soft Computing Algorithms
 
 *Note: This project will no longer be maintained as a newer version, using PyTorch, has been developed. There are likely bugs or errors in this code, so proceed with caution if you intend to use this. I encourage people interested in soft computing, or neuro-fuzzy networks (NFNs), to instead refer to my AAMAS 2023 implementation available [here](https://github.com/johnHostetter/AAMAS-2023-FCQL) (provides PyTorch versions of CLIP, ECM, Fuzzy CQL, NFNs).*
 
